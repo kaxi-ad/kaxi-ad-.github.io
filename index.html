@@ -341,14 +341,29 @@
 <h3 id="2、联合索引"><a href="#2、联合索引" class="headerlink" title="2、联合索引"></a>2、联合索引</h3><blockquote>
 <p>对表上对各列进行索引</p>
 </blockquote>
-<p><img src="/images/MySql%E7%B4%A2%E5%BC%95/%E5%9B%BE5-22.jpg" alt="多个键值的B+树"></p>
+<p><img src="/images/MySql%E7%B4%A2%E5%BC%95/%E5%9B%BE5-22.png" alt="多个键值的B+树"></p>
 <p>假定两个键值的名称分别为a、b</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">对于条件<span class="keyword">where</span> a<span class="operator">=</span> XX <span class="keyword">and</span> b<span class="operator">=</span> XX</span><br><span class="line">以及 <span class="keyword">where</span> a<span class="operator">=</span> XX 都是可用的</span><br><span class="line">但是 <span class="keyword">where</span> b<span class="operator">=</span> XX 不可用</span><br></pre></td></tr></table></figure>
 
 <p>优势，已经对第二个键值进行了排序</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">where</span> a<span class="operator">=</span>xx <span class="keyword">order</span> <span class="keyword">by</span> b可用</span><br></pre></td></tr></table></figure>
 
-<h3 id="3、覆盖索引"><a href="#3、覆盖索引" class="headerlink" title="3、覆盖索引"></a>3、覆盖索引</h3> 
+<h3 id="3、覆盖索引"><a href="#3、覆盖索引" class="headerlink" title="3、覆盖索引"></a>3、覆盖索引</h3><p>覆盖索引（overing index）</p>
+<p>从辅助索引中就可以得到查询的记录，不需要查询聚集索引中的记录。</p>
+<p>优势：</p>
+<ul>
+<li>由于覆盖索引是辅助索引不包含整行记录的索引信息，大小远小于聚集索引，减少IO操作。</li>
+<li>对统计问题而言，由于bug_log表上有辅助索引，辅助索引远小于聚集索引，选择辅助索引可以减少IO操作，优化器自动选择辅助索引。（表现为possible_keys列为null，但实际使用了索引）</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="built_in">COUNT</span>(<span class="operator">*</span>) <span class="keyword">FROM</span> bug_log</span><br></pre></td></tr></table></figure>
+
+<p>联合索引</p>
+<p>SQL查询是统计操作，并且可以利用到覆盖索引的信息，因此优化器会选择联合索引。</p>
+<h3 id="4、优化器选择不使用索引的情况"><a href="#4、优化器选择不使用索引的情况" class="headerlink" title="4、优化器选择不使用索引的情况"></a>4、优化器选择不使用索引的情况</h3><p>对于不能进行索引覆盖的情况，优化器选择辅助索引的情况是，<strong>通过辅助索引查找的数据是少量的</strong></p>
+<p>可使用FORCXE INDEX强制使用某个索引</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">select * FROM orderdetails FORCE INDEX(OrderID)</span><br><span class="line">WHERE orderid&gt;10000 and orderid&lt;102000;</span><br></pre></td></tr></table></figure>
+
+ 
       <!-- reward -->
       
     </div>
