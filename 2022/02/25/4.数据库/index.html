@@ -84,7 +84,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-quill-pen-line"></i>
             <span class="post-meta-item-text"> 字数统计:</span>
-            <span class="post-count">2k</span>
+            <span class="post-count">2.3k</span>
         </span>
     </span>
 
@@ -93,7 +93,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-book-open-line"></i>
             <span class="post-meta-item-text"> 阅读时长≈</span>
-            <span class="post-count">7 分钟</span>
+            <span class="post-count">8 分钟</span>
         </span>
     </span>
 </div>
@@ -460,7 +460,7 @@
 </tr>
 <tr>
 <td>幻读</td>
-<td>查询得到的数据状态不准确,导致幻读.</td>
+<td>第一次读取后，其他事务进行了insert或delete操作，第二次读取，数据不一致</td>
 </tr>
 </tbody></table>
 <p>（2）四种隔离级别</p>
@@ -498,6 +498,18 @@
 <td></td>
 </tr>
 </tbody></table>
+<p>（3）详细</p>
+<p><strong>读未提交</strong></p>
+<p>一个事务1开启后，进行update操作，此时另一事务2也开启，进行了查询操作，查询到了事务1update操作后的数据，此时事务1未提交，之后事务1回滚，事务2再查询就不一致了，导致了脏读。</p>
+<p><strong>读已提交</strong></p>
+<p>事务1开启后，进行update操作，此时其他事务无法查询修改，只有等事务1提交后，才能查询修改。</p>
+<p>解决了脏读问题，但是如果update之前，事务2进行查询，update提交后，事务2又进行查询，一个事务中查询记录不一致，导致不可重复读。</p>
+<p><strong>可重复读</strong></p>
+<p>事务1开启后，查询修改时，其他事务无法查询修改，只有等事务1提交后，才能查询修改。</p>
+<p>可能读到别的事务新增或删除的数据，导致幻读</p>
+<p><strong>串行化</strong></p>
+<p>Serializable最高的事务隔离级别，事务串行化顺序执行，避免脏读、不可重复读和幻读。</p>
+<p>小路地下，耗数据库性能，一般不使用。</p>
 <h1 id="MySQL多表-amp-外键-amp-数据库设计"><a href="#MySQL多表-amp-外键-amp-数据库设计" class="headerlink" title="MySQL多表&amp;外键&amp;数据库设计"></a>MySQL多表&amp;外键&amp;数据库设计</h1><h2 id="一、外键约束"><a href="#一、外键约束" class="headerlink" title="一、外键约束"></a>一、外键约束</h2><h3 id="1、创建外键约束"><a href="#1、创建外键约束" class="headerlink" title="1、创建外键约束"></a>1、创建外键约束</h3><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[<span class="keyword">CONSTRAINT</span>] [外键约束名称] <span class="keyword">FOREIGN</span> KEY(外键字段名) <span class="keyword">REFERENCES</span> 主表名(主键字段名)</span><br></pre></td></tr></table></figure>
 
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ALTER TABLE 从表 ADD [CONSTRAINT] [外键约束名称] FOREIGN KEY (外键字段名) REFERENCES 主表(主 键字段名);</span><br></pre></td></tr></table></figure>

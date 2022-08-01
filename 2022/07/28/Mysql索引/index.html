@@ -84,7 +84,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-quill-pen-line"></i>
             <span class="post-meta-item-text"> 字数统计:</span>
-            <span class="post-count">2.4k</span>
+            <span class="post-count">2.5k</span>
         </span>
     </span>
 
@@ -283,8 +283,12 @@
 <p>联合索引</p>
 <p>SQL查询是统计操作，并且可以利用到覆盖索引的信息，因此优化器会选择联合索引。</p>
 <h3 id="4、优化器选择不使用索引的情况"><a href="#4、优化器选择不使用索引的情况" class="headerlink" title="4、优化器选择不使用索引的情况"></a>4、优化器选择不使用索引的情况</h3><p>对于不能进行索引覆盖的情况，优化器选择辅助索引的情况是，<strong>通过辅助索引查找的数据是少量的</strong></p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="built_in">count</span>(<span class="operator">*</span>) <span class="keyword">from</span> orderdetails</span><br><span class="line"><span class="keyword">WHERE</span> orderid<span class="operator">&gt;</span><span class="number">10000</span> <span class="keyword">and</span> orderid<span class="operator">&lt;</span><span class="number">102000</span>;</span><br></pre></td></tr></table></figure>
+
+
+
 <p>可使用FORCXE INDEX强制使用某个索引</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">select * FROM orderdetails FORCE INDEX(OrderID)</span><br><span class="line">WHERE orderid&gt;10000 and orderid&lt;102000;</span><br></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">FROM</span> orderdetails FORCE INDEX(OrderID)</span><br><span class="line"><span class="keyword">WHERE</span> orderid<span class="operator">&gt;</span><span class="number">10000</span> <span class="keyword">and</span> orderid<span class="operator">&lt;</span><span class="number">102000</span>;</span><br></pre></td></tr></table></figure>
 
  
       <!-- reward -->
