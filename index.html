@@ -154,6 +154,384 @@
     
     
     <article
+  id="post-Mysql锁"
+  class="article article-type-post"
+  itemscope
+  itemprop="blogPost"
+  data-scroll-reveal
+>
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2022/08/01/Mysql%E9%94%81/"
+    >Mysql锁</a> 
+</h2>
+ 
+
+      
+    </header>
+     
+    <div class="article-meta">
+      <a href="/2022/08/01/Mysql%E9%94%81/" class="article-date">
+  <time datetime="2022-08-01T09:47:25.000Z" itemprop="datePublished">2022-08-01</time>
+</a> 
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a>
+  </div>
+   
+    </div>
+      
+    <div class="article-entry" itemprop="articleBody">
+       
+  <h1 id="MySql锁"><a href="#MySql锁" class="headerlink" title="MySql锁"></a>MySql锁</h1><blockquote>
+<p>人们认为行就送总会增加开销。实际上，只有当实现本身会增加开销时，行级锁才会增加开销。InnoDB存储引擎不需要锁升级，因为一个锁和多个锁的开销是相同的。</p>
+</blockquote>
+<h2 id="一、什么是锁（what）"><a href="#一、什么是锁（what）" class="headerlink" title="一、什么是锁（what）"></a>一、什么是锁（what）</h2><p>​		锁是数据库系统区别于文件系统的一个关键特性。锁机制用于管理对共享资源的并发访问。</p>
+<p>​		对于MyISAM引擎，其锁是表锁设计。并发情况下的读没有问题，但是并发插入时的性能就要差一些了。</p>
+<h2 id="二、lock"><a href="#二、lock" class="headerlink" title="二、lock"></a>二、lock</h2><p>​		lock的对象是事务，用来锁定的是数据库中的对象，如表、页、行。并且一般lock的对象仅在事务commit或rollback后进行释放（不同事务隔离级别释放的时间可能不同）。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SHOW ENGINE INNODB STATUS</span><br><span class="line">以及information_schema架构下的表INNODB_TRX、INNODB_LOCKS、INNODB_LOCK_WAITS来观察锁信息。</span><br></pre></td></tr></table></figure>
+
+<h2 id="三、InnoDB存储引擎中的锁"><a href="#三、InnoDB存储引擎中的锁" class="headerlink" title="三、InnoDB存储引擎中的锁"></a>三、InnoDB存储引擎中的锁</h2><h3 id="1、锁的类型"><a href="#1、锁的类型" class="headerlink" title="1、锁的类型"></a>1、锁的类型</h3><p>InnoDB实现的两种标准行级锁：</p>
+<ul>
+<li>共享锁（S Lock），允许事务读一行数据</li>
+<li>排他锁（X Lock），允许事务删除或更新一行数据</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>X</th>
+<th>S</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>X</td>
+<td>不兼容</td>
+<td>不兼容</td>
+</tr>
+<tr>
+<td>S</td>
+<td>不兼容</td>
+<td>兼容</td>
+</tr>
+</tbody></table>
+<p>注意：S和X锁都是行锁，兼容指对同一记录（row）锁的兼容性情况。</p>
+<p><strong>意向锁</strong>：将锁定的对象分为多个层次，意向锁意味着事务希望在更细粒度上进行加锁。</p>
+<blockquote>
+<p>若将上锁的对象看成一棵树，那么对最下层的对象上锁，也就是对最细粒度的对象进行上锁，熟悉需要对粗粒度的对象上锁。</p>
+</blockquote>
+<p>InnoDB意向锁即为表级别的锁。</p>
+<p>支持两种意向锁：</p>
+<ul>
+<li>意向共享锁（IS Lock），事务想要获得一张表中某几行的共享锁。</li>
+<li>意向排他锁（IX Lock），事务想要获得一张表中某几行的排他锁。</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>IS</th>
+<th>IX</th>
+<th>S</th>
+<th>X</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IS</td>
+<td>兼容</td>
+<td>兼容</td>
+<td>兼容</td>
+<td>不兼容</td>
+</tr>
+<tr>
+<td>IX</td>
+<td>兼容</td>
+<td>兼容</td>
+<td>不兼容</td>
+<td>不兼容</td>
+</tr>
+<tr>
+<td>S</td>
+<td>兼容</td>
+<td>不兼容</td>
+<td>兼容</td>
+<td>不兼容</td>
+</tr>
+<tr>
+<td>X</td>
+<td>不兼容</td>
+<td>不兼容</td>
+<td>不兼容</td>
+<td>不兼容</td>
+</tr>
+</tbody></table>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SHOW</span> ENGINE INNODB STATUS查看当前锁请求的信息</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight scheme"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">------------</span><br><span class="line">TRANSACTIONS</span><br><span class="line">------------</span><br><span class="line">Trx id counter <span class="number">261562</span></span><br><span class="line">Purge done for trx<span class="symbol">&#x27;s</span> n:o &lt; <span class="number">261560</span> undo n:o &lt; <span class="number">0</span> state: running but idle</span><br><span class="line">History list length <span class="number">8</span></span><br><span class="line">LIST OF TRANSACTIONS FOR EACH SESSION:</span><br><span class="line">---TRANSACTION <span class="number">283159487235888</span>, not started</span><br><span class="line"><span class="number">0</span> lock struct(<span class="name">s</span>), heap size <span class="number">1136</span>, <span class="number">0</span> row lock(<span class="name">s</span>)</span><br><span class="line">---TRANSACTION <span class="number">261561</span>, ACTIVE <span class="number">30</span> sec starting index read</span><br><span class="line">mysql tables in use <span class="number">1</span>, locked <span class="number">1</span></span><br><span class="line">LOCK WAIT <span class="number">2</span> lock struct(<span class="name">s</span>), heap size <span class="number">1136</span>, <span class="number">1</span> row lock(<span class="name">s</span>)</span><br><span class="line">MySQL thread id <span class="number">13</span>, OS thread handle <span class="number">27560</span>, query id <span class="number">173</span> localhost ::<span class="number">1</span> root updating</span><br><span class="line">update rlock set a=<span class="number">4</span> where a=<span class="number">1</span></span><br><span class="line">Trx read view will not see trx with id &gt;= <span class="number">261561</span>, sees &lt; <span class="number">261560</span></span><br><span class="line">------- TRX HAS BEEN WAITING <span class="number">12</span> SEC FOR THIS LOCK TO BE GRANTED:</span><br><span class="line">RECORD LOCKS space id <span class="number">1138</span> page no <span class="number">3</span> n bits <span class="number">72</span> index GEN_CLUST_INDEX of table `test`.`rlock` trx id <span class="number">261561</span> lock_mode X waiting</span><br><span class="line">Record lock, heap no <span class="number">2</span> PHYSICAL RECORD: n_fields <span class="number">4</span><span class="comment">; compact format; info bits 0</span></span><br><span class="line"> <span class="number">0</span>: len <span class="number">6</span><span class="comment">; hex 00000003b200; asc       ;;</span></span><br><span class="line"> <span class="number">1</span>: len <span class="number">6</span><span class="comment">; hex 00000003fda6; asc       ;;</span></span><br><span class="line"> <span class="number">2</span>: len <span class="number">7</span><span class="comment">; hex 2300000124157b; asc #   $ &#123;;;</span></span><br><span class="line"> <span class="number">3</span>: len <span class="number">4</span><span class="comment">; hex 80000001; asc     ;;</span></span><br><span class="line"></span><br><span class="line">------------------</span><br><span class="line">---TRANSACTION <span class="number">261560</span>, ACTIVE <span class="number">43</span> sec</span><br><span class="line"><span class="number">2</span> lock struct(<span class="name">s</span>), heap size <span class="number">1136</span>, <span class="number">4</span> row lock(<span class="name">s</span>)</span><br><span class="line">MySQL thread id <span class="number">12</span>, OS thread handle <span class="number">14848</span>, query id <span class="number">170</span> localhost ::<span class="number">1</span> root</span><br></pre></td></tr></table></figure>
+
+<p>locks rec but not gap代表锁住的是一个索引，不是一个范围。</p>
+<p>从InnoDB1.0版本开始，在INFORMATION_SCHEMA架构下添加了表<strong>INNODB_TRX</strong>、<strong>INNODB_LOCKS</strong>、<strong>INNODB_LOCK_WAITS</strong>。通过这三张表，用户可以更简单地监控当前事务并分析可能存在的锁问题。</p>
+<p><strong>INNODB_TRX</strong></p>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>trx_id</td>
+<td>事务ID</td>
+</tr>
+<tr>
+<td>trx_state</td>
+<td>事务状态</td>
+</tr>
+<tr>
+<td>trx_started</td>
+<td>事务开始时间</td>
+</tr>
+<tr>
+<td>trx_requested_lock_id</td>
+<td>等待事务的锁ID。</td>
+</tr>
+<tr>
+<td>trx_wait_started</td>
+<td>事务等待开始时间</td>
+</tr>
+<tr>
+<td>trx_weight</td>
+<td>事务权重，反映了一个事务修改和锁住的行数。在InnoDB存储引擎中，发生死锁需要回滚时，Inn哦DB存储引擎会选择该值最小的进行回滚。</td>
+</tr>
+<tr>
+<td>trx_mysql_thread_id</td>
+<td>MySql中的线程ID</td>
+</tr>
+<tr>
+<td>trx_query</td>
+<td>事务运行的SQL语句</td>
+</tr>
+</tbody></table>
+<p>例子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.INNODB_TRX\G;</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">                    trx_id: <span class="number">261579</span></span><br><span class="line">                 trx_state: <span class="keyword">RUNNING</span></span><br><span class="line">               trx_started: <span class="number">2022</span><span class="number">-08</span><span class="number">-02</span> <span class="number">09</span>:<span class="number">56</span>:<span class="number">47</span></span><br><span class="line">     trx_requested_lock_id: <span class="keyword">NULL</span></span><br><span class="line">          trx_wait_started: <span class="keyword">NULL</span></span><br><span class="line">                trx_weight: <span class="number">1</span></span><br><span class="line">       trx_mysql_thread_id: <span class="number">13</span></span><br><span class="line">                 trx_query: <span class="keyword">NULL</span></span><br><span class="line">       trx_operation_state: <span class="keyword">NULL</span></span><br><span class="line">         trx_tables_in_use: <span class="number">0</span></span><br><span class="line">         trx_tables_locked: <span class="number">1</span></span><br><span class="line">          trx_lock_structs: <span class="number">1</span></span><br><span class="line">     trx_lock_memory_bytes: <span class="number">1136</span></span><br><span class="line">           trx_rows_locked: <span class="number">1</span></span><br><span class="line">         trx_rows_modified: <span class="number">0</span></span><br><span class="line">   trx_concurrency_tickets: <span class="number">0</span></span><br><span class="line">       trx_isolation_level: REPEATABLE READ</span><br><span class="line">         trx_unique_checks: <span class="number">1</span></span><br><span class="line">    trx_foreign_key_checks: <span class="number">1</span></span><br><span class="line">trx_last_foreign_key_error: <span class="keyword">NULL</span></span><br><span class="line"> trx_adaptive_hash_latched: <span class="number">0</span></span><br><span class="line"> trx_adaptive_hash_timeout: <span class="number">0</span></span><br><span class="line">          trx_is_read_only: <span class="number">0</span></span><br><span class="line">trx_autocommit_non_locking: <span class="number">0</span></span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">2.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">                    trx_id: <span class="number">261578</span></span><br><span class="line">                 trx_state: <span class="keyword">RUNNING</span></span><br><span class="line">               trx_started: <span class="number">2022</span><span class="number">-08</span><span class="number">-02</span> <span class="number">09</span>:<span class="number">56</span>:<span class="number">33</span></span><br><span class="line">     trx_requested_lock_id: <span class="keyword">NULL</span></span><br><span class="line">          trx_wait_started: <span class="keyword">NULL</span></span><br><span class="line">                trx_weight: <span class="number">4</span></span><br><span class="line">       trx_mysql_thread_id: <span class="number">12</span></span><br><span class="line">                 trx_query: <span class="keyword">NULL</span></span><br><span class="line">       trx_operation_state: <span class="keyword">NULL</span></span><br><span class="line">         trx_tables_in_use: <span class="number">0</span></span><br><span class="line">         trx_tables_locked: <span class="number">1</span></span><br><span class="line">          trx_lock_structs: <span class="number">2</span></span><br><span class="line">     trx_lock_memory_bytes: <span class="number">1136</span></span><br><span class="line">           trx_rows_locked: <span class="number">1</span></span><br><span class="line">         trx_rows_modified: <span class="number">2</span></span><br><span class="line">   trx_concurrency_tickets: <span class="number">0</span></span><br><span class="line">       trx_isolation_level: REPEATABLE READ</span><br><span class="line">         trx_unique_checks: <span class="number">1</span></span><br><span class="line">    trx_foreign_key_checks: <span class="number">1</span></span><br><span class="line">trx_last_foreign_key_error: <span class="keyword">NULL</span></span><br><span class="line"> trx_adaptive_hash_latched: <span class="number">0</span></span><br><span class="line"> trx_adaptive_hash_timeout: <span class="number">0</span></span><br><span class="line">          trx_is_read_only: <span class="number">0</span></span><br><span class="line">trx_autocommit_non_locking: <span class="number">0</span></span><br><span class="line"><span class="number">2</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.00</span> sec)</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>INNODB_LOCKS</strong>查看锁</p>
+<table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>lock_id</td>
+<td>锁ID</td>
+</tr>
+<tr>
+<td>lock_trx_id</td>
+<td>事务ID</td>
+</tr>
+<tr>
+<td>lock_mode</td>
+<td>锁的模型</td>
+</tr>
+<tr>
+<td>lock_type</td>
+<td>锁的类型，表锁还是行锁</td>
+</tr>
+<tr>
+<td>lock_table</td>
+<td>要加锁的表</td>
+</tr>
+<tr>
+<td>lock_index</td>
+<td>锁住的索引</td>
+</tr>
+<tr>
+<td>lock_space</td>
+<td>锁对象的space id</td>
+</tr>
+<tr>
+<td>lock_page</td>
+<td>事务锁定页的数量，若为表锁，null</td>
+</tr>
+<tr>
+<td>lock_rec</td>
+<td>事务锁定行的数量，若为表锁，null</td>
+</tr>
+<tr>
+<td>lock_data</td>
+<td>事务锁定记录的主键值，若为表锁，null</td>
+</tr>
+</tbody></table>
+<p>例子：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.INNODB_LOCKS\G;</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">    lock_id: <span class="number">261579</span>:<span class="number">1140</span>:<span class="number">3</span>:<span class="number">2</span></span><br><span class="line">lock_trx_id: <span class="number">261579</span></span><br><span class="line">  lock_mode: X</span><br><span class="line">  lock_type: RECORD</span><br><span class="line"> lock_table: `test`.`rlock`</span><br><span class="line"> lock_index: <span class="keyword">PRIMARY</span></span><br><span class="line"> lock_space: <span class="number">1140</span></span><br><span class="line">  lock_page: <span class="number">3</span></span><br><span class="line">   lock_rec: <span class="number">2</span></span><br><span class="line">  lock_data: <span class="number">1</span></span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">2.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">    lock_id: <span class="number">261578</span>:<span class="number">1140</span>:<span class="number">3</span>:<span class="number">2</span></span><br><span class="line">lock_trx_id: <span class="number">261578</span></span><br><span class="line">  lock_mode: X</span><br><span class="line">  lock_type: RECORD</span><br><span class="line"> lock_table: `test`.`rlock`</span><br><span class="line"> lock_index: <span class="keyword">PRIMARY</span></span><br><span class="line"> lock_space: <span class="number">1140</span></span><br><span class="line">  lock_page: <span class="number">3</span></span><br><span class="line">   lock_rec: <span class="number">2</span></span><br><span class="line">  lock_data: <span class="number">1</span></span><br><span class="line"><span class="number">2</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span>, <span class="number">1</span> warning (<span class="number">0.02</span> sec)</span><br></pre></td></tr></table></figure>
+
+<p>INNODB_LOCK_WAITS事务的等待</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>requesting_trx_id</td>
+<td>申请锁资源的事务ID</td>
+</tr>
+<tr>
+<td>requesting_lock_id</td>
+<td>申请的锁的ID</td>
+</tr>
+<tr>
+<td>blocking_trx_id</td>
+<td>阻塞的事务ID</td>
+</tr>
+<tr>
+<td>blocking_lock_id</td>
+<td>阻塞的锁ID</td>
+</tr>
+</tbody></table>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> information_schema.INNODB_LOCK_WAITS\G;</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line">requesting_trx_id: <span class="number">261579</span></span><br><span class="line">requested_lock_id: <span class="number">261579</span>:<span class="number">1140</span>:<span class="number">3</span>:<span class="number">2</span></span><br><span class="line">  blocking_trx_id: <span class="number">261578</span></span><br><span class="line"> blocking_lock_id: <span class="number">261578</span>:<span class="number">1140</span>:<span class="number">3</span>:<span class="number">2</span></span><br><span class="line"><span class="number">1</span> <span class="type">row</span> <span class="keyword">in</span> <span class="keyword">set</span>, <span class="number">1</span> warning (<span class="number">0.00</span> sec)</span><br></pre></td></tr></table></figure>
+
+<p>如果需要，用户可以根据三张表联合查询得到更直观的详细信息</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span></span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    r.trx_id waiting_trx_id,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    r.trx_mysql_thread_id waiting_thread,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    r.trx_query waiting_query,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    b.trx_id blocking_trx_id,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    b.trx_mysql_thread_id blocking_thread,</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span>    b.trx_query blocking_query</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span> <span class="keyword">from</span> information_schema.innodb_lock_waits w</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span> <span class="keyword">INNER</span> <span class="keyword">JOIN</span> information_schema.innodb_trx b</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span> <span class="keyword">ON</span> b.trx_id <span class="operator">=</span> w.blocking_trx_id</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span> <span class="keyword">INNER</span> <span class="keyword">JOIN</span> information_schema.innodb_trx r</span><br><span class="line">    <span class="operator">-</span><span class="operator">&gt;</span> <span class="keyword">ON</span> r.trx_id <span class="operator">=</span> w.requesting_trx_id\G;</span><br><span class="line"><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span> <span class="number">1.</span> <span class="type">row</span> <span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span><span class="operator">*</span></span><br><span class="line"> waiting_trx_id: <span class="number">261579</span></span><br><span class="line"> waiting_thread: <span class="number">13</span></span><br><span class="line">  waiting_query: <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> rlock <span class="keyword">for</span> <span class="keyword">update</span></span><br><span class="line">blocking_trx_id: <span class="number">261578</span></span><br><span class="line">blocking_thread: <span class="number">12</span></span><br><span class="line"> blocking_query: <span class="keyword">NULL</span></span><br><span class="line"><span class="number">1</span> <span class="type">row</span> <span class="keyword">in</span> <span class="keyword">set</span>, <span class="number">1</span> warning (<span class="number">0.01</span> sec)</span><br></pre></td></tr></table></figure>
+
+<h3 id="2、一致性非锁定读"><a href="#2、一致性非锁定读" class="headerlink" title="2、一致性非锁定读"></a>2、一致性非锁定读</h3><p>​		一致性的非锁定读（consistent nonlocking read）是指</p>
+<p>InnoDB存储引擎通过行多版本控制（multi versioning）的方式来读取当前执行时间数据库中行的数据。如果读取的行正在执行DELETE或UPDATE操作，这是读取操作不会因此去等待行上锁的释放。相反地，InnoDB存储引擎获取读取行的一个快照数据。</p>
+<p><img src="/images/MySql%E9%94%81/1.png" alt="InnoDB存储引擎非锁定的一致性读"></p>
+<p>之所以称其为非锁定读，因为不需要等待访问的行上X锁的释放。</p>
+<p>​		在不同事务隔离级别下，读取方式不同，并不是在每个事务隔离级别下都是采用非锁定的一致性读。</p>
+<p>​		一个行记录可能不止一个快照数据，一般称这种技术为行多版本技术。由此带来的并发控制，称之为多版本并发控制（Multi Version Concurrency Control，MVCC）。</p>
+<ul>
+<li>在READ COMMITTED事务隔离级别下，对于快照数据，非一致性读总是读取被锁定行的最新一份快照数据。</li>
+<li>在REPEATABLE READ事务隔离级别下，对于快照数据，非一致性读总是读取事务开始时的行数据版本。</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="operator">/</span><span class="operator">/</span>查询事务隔离级别</span><br><span class="line"><span class="keyword">SELECT</span> @<span class="variable">@tx</span>_isolation;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3、一致性锁定读"><a href="#3、一致性锁定读" class="headerlink" title="3、一致性锁定读"></a>3、一致性锁定读</h3><p>​	某些情况下，用户需要显式地对数据库读取操作进行加锁以保证数据逻辑的一致性。而这要求数据库支持加锁语句，即使是对于select的只读操作。</p>
+<p>​		InnoDB存储引擎对于select语句支持两种一致性的锁定读(locking read)操作：</p>
+<ul>
+<li>select ··· for update</li>
+<li>select ··· lock in share mode</li>
+</ul>
+<p>select ··· for update 对读取的行记录加一个x锁，其他事务不能对已锁定的行加上任何锁。</p>
+<p>select ··· lock in share mode对读取的行记录加一个S锁，其他事务可以想被锁定的行加S锁，但如果加X锁，会被阻塞。</p>
+<p>​		select···for update，select···lock in share mode必须在一个事务中，事务提交，锁释放。可使用begin，start transaction 或者set autocommit&#x3D;0。</p>
+<h3 id="4、自增长与锁"><a href="#4、自增长与锁" class="headerlink" title="4、自增长与锁"></a>4、自增长与锁</h3><p>​	对于有自增长值得列得并发插入性能较差，事务必须等待前一个插入的完成（虽然不用等待事务的完成）。其次，对于INSERT···SELECT的大数据量的插入会影响插入的性能，因为另一个事务中的插入会被阻塞。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="built_in">max</span>(auto_inc_col) <span class="keyword">from</span> t <span class="keyword">for</span> <span class="keyword">update</span>;</span><br></pre></td></tr></table></figure>
+
+<p>在InnoDB存储引擎中，自增长值得列必须是索引，同时必须是索引的第一个列。</p>
+<h3 id="5、外键和锁"><a href="#5、外键和锁" class="headerlink" title="5、外键和锁"></a>5、外键和锁</h3><p>​		在InnoDB存储引擎中，对于一个外键列，如果没有显式地对这个列加索引，InnoDB存储引擎自动对其加一个索引，因为这样可以避免表锁———这比Oracle数据库做得好。</p>
+<h2 id="四、锁的算法"><a href="#四、锁的算法" class="headerlink" title="四、锁的算法"></a>四、锁的算法</h2><h3 id="1、行锁的3种算法"><a href="#1、行锁的3种算法" class="headerlink" title="1、行锁的3种算法"></a>1、行锁的3种算法</h3><p>InnoDB存储引擎有3种行锁的算法，分别是：</p>
+<ul>
+<li>Record Lock：单个行记录上的锁</li>
+<li>Gap Lock：间隙锁，锁定一个范围，不包含记录本身</li>
+<li>Next-Key Lock：Gap Lock+Record Lock，锁定一个范围，并且锁定记录本身</li>
+</ul>
+<p>Record Lock总是会去锁住索引记录，如果InnoDB存储引擎表在建立的时候没有设置任何一个索引，那么这时InnoDB存储引擎会使用隐式的主键来锁定。</p>
+<p>InnoDB对于行的查询都是采用Next-Key Lock算法。</p>
+<p>例如：</p>
+<p>​	一个索引有10，11，13和20，区间：</p>
+<p>(-∞,10]</p>
+<p>(10,11]</p>
+<p>(11,13]</p>
+<p>(13,20]</p>
+<p>(20,+∞)</p>
+<p>若事务T1已经通过next-key locking锁定了如下范围：</p>
+<p>(10,11]、(11,13]</p>
+<p>当插入新的记录12时，锁定的范围会变成:</p>
+<p>(10,11]、(11,12]、(12,13]</p>
+<p><strong>唯一索引</strong>：当查询的索引含有<strong>唯一属性</strong>时，InnoDB存储引擎会对Next-Key Lock进行优化，将其降级为Record Lock，即仅锁住索引本身，而不是范围，提高应用的并发性。</p>
+<p><strong>辅助索引情况</strong></p>
+<p>实例：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">create</span> <span class="keyword">table</span> z ( a <span class="type">int</span>,b <span class="type">int</span>,<span class="keyword">PRIMARY</span> KEY(a),KEY(b));</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> z <span class="keyword">select</span> <span class="number">1</span>,<span class="number">1</span>;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> z <span class="keyword">select</span> <span class="number">3</span>,<span class="number">1</span>;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> z <span class="keyword">select</span> <span class="number">5</span>,<span class="number">3</span>;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> z <span class="keyword">select</span> <span class="number">7</span>,<span class="number">6</span>;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> z <span class="keyword">select</span> <span class="number">10</span>,<span class="number">8</span>;</span><br></pre></td></tr></table></figure>
+
+<p>事务A</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> z <span class="keyword">where</span> b<span class="operator">=</span><span class="number">3</span> <span class="keyword">for</span> <span class="keyword">update</span></span><br></pre></td></tr></table></figure>
+
+<p>sql通过索引列b进行查询，使用传统的Next-Key Locking技术加锁。</p>
+<p>由于有两个索引，需要分别进行锁定。</p>
+<p>对于辅助索引，加上的是Next-Key Lock,锁定的范围是**(1,3)<strong>，特别需要注意的是，InnoDB存储引擎会对辅助索引下一个键值加上gap lock，即还有一个辅助索引范围为</strong>(3,6)**的锁。</p>
+<p>Gap Lock的作用是为了阻止多个事务将记录插入到同一范围内，而这会导致Phantom Problem问题的产生。</p>
+<h3 id="2、解决Phantom-Problem（幻读）"><a href="#2、解决Phantom-Problem（幻读）" class="headerlink" title="2、解决Phantom Problem（幻读）"></a>2、解决Phantom Problem（幻读）</h3><p>Phantom Problem指同一事务下，连续执行两次同样的SQL语句可能导致不同的结果，第二次的SQL语句可能会返回之前不存在的行。</p>
+<p>​		InnoDB存储引擎默认的事务隔离级别是<strong>REPEATABLE READ</strong>，在该隔离级别下，其采用Next-Key Locking方式加锁。</p>
+<p>​		而在事务隔离级别<strong>READ COMMITED</strong>下，其仅采用Record Lock；</p>
+<p>实现唯一性检查：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span> <span class="keyword">FROM</span> <span class="keyword">table</span> <span class="keyword">WHERE</span> col <span class="operator">=</span> xxx LOCK <span class="keyword">IN</span> SHARE MODE;</span><br><span class="line"></span><br><span class="line">If <span class="keyword">not</span> found <span class="keyword">any</span> <span class="type">row</span>:</span><br><span class="line">	# <span class="keyword">unique</span> <span class="keyword">for</span> <span class="keyword">insert</span> <span class="keyword">value</span></span><br><span class="line">	<span class="keyword">INSERT</span> <span class="keyword">INTO</span> <span class="keyword">table</span> <span class="keyword">VALUES</span> (...);</span><br></pre></td></tr></table></figure>
+
+
+
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>begin</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>select * from z where b &#x3D; 4 lock in share mode；（S锁）</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>select * from z where b &#x3D; 4 lock in share mode；（S锁）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>INSERT INTO z SELECT 4，4；#阻塞</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td></td>
+<td>INSERT INTO z SELECT 4，4；<br>ERROR 1213（40001）:Deadlock found when trying to get lock;try restarting transaction#抛出死锁异常</td>
+</tr>
+<tr>
+<td>6</td>
+<td>#INSERT插入成功</td>
+<td></td>
+</tr>
+</tbody></table>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> @<span class="variable">@tx</span>_isolation<span class="operator">=</span><span class="number">0</span> #设置事务隔离级别</span><br></pre></td></tr></table></figure>
+
+
+
+<p>锁定由Next-Key Lock算法降级为了Record Lock，从而提高应用的并发性。</p>
+ 
+      <!-- reward -->
+      
+    </div>
+    
+
+    <!-- copyright -->
+    
+    <footer class="article-footer">
+       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/mysql/" rel="tag">mysql</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E9%94%81/" rel="tag">锁</a></li></ul>
+
+    </footer>
+  </div>
+
+    
+ 
+    
+</article>
+
+    
+    <article
   id="post-Mysql索引"
   class="article article-type-post"
   itemscope
@@ -2002,106 +2380,6 @@
     
     <footer class="article-footer">
        
-    </footer>
-  </div>
-
-    
- 
-    
-</article>
-
-    
-    <article
-  id="post-设计模式"
-  class="article article-type-post"
-  itemscope
-  itemprop="blogPost"
-  data-scroll-reveal
->
-  <div class="article-inner">
-    
-    <header class="article-header">
-       
-<h2 itemprop="name">
-  <a class="article-title" href="/2022/03/18/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/"
-    >设计模式</a> 
-</h2>
- 
-
-      
-    </header>
-     
-    <div class="article-meta">
-      <a href="/2022/03/18/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/" class="article-date">
-  <time datetime="2022-03-18T02:29:00.000Z" itemprop="datePublished">2022-03-18</time>
-</a> 
-  <div class="article-category">
-    <a class="article-category-link" href="/categories/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/">设计模式</a>
-  </div>
-   
-    </div>
-      
-    <div class="article-entry" itemprop="articleBody">
-       
-  <h1 id="设计模式"><a href="#设计模式" class="headerlink" title="设计模式"></a>设计模式</h1><h2 id="构建型设计模式"><a href="#构建型设计模式" class="headerlink" title="构建型设计模式"></a>构建型设计模式</h2><h3 id="1、工厂设计模式"><a href="#1、工厂设计模式" class="headerlink" title="1、工厂设计模式"></a>1、工厂设计模式</h3><p>简单工厂模式：一个工厂类负责new对象，需要构建直接调用方法</p>
-<p>工厂方法模式：父类中只有一个抽象方法，子类重写该方法构造</p>
-<p>抽象工厂模式：有一个总的抽象父类</p>
-<h3 id="2、单例设计模式"><a href="#2、单例设计模式" class="headerlink" title="2、单例设计模式"></a>2、单例设计模式</h3><p>饿汉式</p>
-<p>懒汉式：双检锁、静态内部类</p>
-<h3 id="3、建造型模式"><a href="#3、建造型模式" class="headerlink" title="3、建造型模式"></a>3、建造型模式</h3><p>实体类内部构建一个builder实体，负责定义属性</p>
-<h3 id="4、原型模式"><a href="#4、原型模式" class="headerlink" title="4、原型模式"></a>4、原型模式</h3><p>原型实例指定创建对象的种类，并且通过拷贝这些原型创建新的对象。</p>
-<p>实现Cloneable，重写clone()方法，原本的clone()方法只有浅拷贝</p>
-<h2 id="结构型模式"><a href="#结构型模式" class="headerlink" title="结构型模式"></a>结构型模式</h2><h3 id="1、适配器模式"><a href="#1、适配器模式" class="headerlink" title="1、适配器模式"></a>1、适配器模式</h3><ul>
-<li>增加一个适配器，对数据进行转换，防止数据异常</li>
-</ul>
-<h3 id="2、桥接模式"><a href="#2、桥接模式" class="headerlink" title="2、桥接模式"></a>2、桥接模式</h3><ul>
-<li>将抽象部分与实现部分分离。形状桥接颜色</li>
-<li>合成 &#x2F; 聚合复用原则：优先使用合成 &#x2F; 聚合，而不是类继承。</li>
-</ul>
-<h3 id="3、组合模式"><a href="#3、组合模式" class="headerlink" title="3、组合模式"></a>3、组合模式</h3><p>管理员和员工</p>
-<ul>
-<li>整体与部分有相似的结构，在操作时可以被一致对待时，就可以使用组合模式。</li>
-</ul>
-<p>透明方式：在接口中声明所有管理子对象的方法，对于外界来说叶节点和枝节点是透明的，它们具备完全一致的接口。</p>
-<p>安全方式：在接口中不声明某些子类特有的方法</p>
-<h3 id="4、装饰模式"><a href="#4、装饰模式" class="headerlink" title="4、装饰模式"></a>4、装饰模式</h3><ul>
-<li>增强原有功能	透明装饰模式</li>
-<li>添加新功能      半透明装饰模式</li>
-</ul>
-<h3 id="5、外观模式"><a href="#5、外观模式" class="headerlink" title="5、外观模式"></a>5、外观模式</h3><p>将多个子系统封装起来，提供一个更简洁的接口供外部调用。</p>
-<h3 id="6、享元模式"><a href="#6、享元模式" class="headerlink" title="6、享元模式"></a>6、享元模式</h3><p>共享对象</p>
-<p>程序可复用的特点</p>
-<h3 id="7、代理模式"><a href="#7、代理模式" class="headerlink" title="7、代理模式"></a>7、代理模式</h3><p>静态代理</p>
-<p>动态代理</p>
-<h2 id="行为型模式"><a href="#行为型模式" class="headerlink" title="行为型模式"></a>行为型模式</h2><h3 id="1、责任链设计模式"><a href="#1、责任链设计模式" class="headerlink" title="1、责任链设计模式"></a>1、责任链设计模式</h3><p>主要用于处理职责相同，程度不同的类</p>
-<h3 id="2、命令模式"><a href="#2、命令模式" class="headerlink" title="2、命令模式"></a>2、命令模式</h3><p>定义命令接口，接口中有执行，和撤销操作（将命令看作一个对象）</p>
-<p>通过Stack&lt;&gt;存取，撤销时，可以多次撤销</p>
-<p>宏命令</p>
-<p>宏命令就是<strong>将多个命令合并起来组成的命令</strong>。</p>
-<h3 id="3、解释器模式"><a href="#3、解释器模式" class="headerlink" title="3、解释器模式"></a>3、解释器模式</h3><p>在解释器模式中，我们将不可拆分的最小单元称之为终结表达式，可以被拆分的表达式称之为非终结表达式。</p>
-<h3 id="4、迭代器模式"><a href="#4、迭代器模式" class="headerlink" title="4、迭代器模式"></a>4、迭代器模式</h3><p>提供一种方法访问一个容器对象中各个元素，而又不需暴露该对象的内部细节。</p>
-<h3 id="5、中介者模式"><a href="#5、中介者模式" class="headerlink" title="5、中介者模式"></a>5、中介者模式</h3><p>定义一个中介对象来封装一系列对象之间的交互，使原有对象之间的耦合松散，且可以独立地改变它们之间的交互。</p>
-<h3 id="6、备忘录模式"><a href="#6、备忘录模式" class="headerlink" title="6、备忘录模式"></a>6、备忘录模式</h3><p>在不破坏封装的条件下，通过备忘录对象存储另外一个对象内部状态的快照，在将来合适的时候把这个对象还原到存储起来的状态</p>
-<h3 id="7、观察者模式"><a href="#7、观察者模式" class="headerlink" title="7、观察者模式"></a>7、观察者模式</h3><p>定义对象间的一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都得到通知并被自动更新。</p>
-<h3 id="8、状态模式"><a href="#8、状态模式" class="headerlink" title="8、状态模式"></a>8、状态模式</h3><p>每个状态类都实现了 IUser 接口，在接口方法中实现自己特定的行为。</p>
-<h3 id="9、策略模式"><a href="#9、策略模式" class="headerlink" title="9、策略模式"></a>9、策略模式</h3><p>定义了一系列算法，并将每一个算法封装起来，而且使它们还可以相互替换。策略模式让算法独立于使用它的客户而独立变化</p>
-<h3 id="10、模板方法模式"><a href="#10、模板方法模式" class="headerlink" title="10、模板方法模式"></a>10、模板方法模式</h3><p>定义一个操作中的算法的骨架，而将一些步骤延迟到子类中。模板方法使得子类可以不改变一个算法的结构即可重定义该算法的某些特定步骤。</p>
-<h3 id="11、访问者模式"><a href="#11、访问者模式" class="headerlink" title="11、访问者模式"></a>11、访问者模式</h3><p>将<code>数据的结构</code>和<code>对数据的操作</code>分离。</p>
-<p>表示一个作用于某对象结构中的各元素的操作。它使你可以在不改变各元素的类的前提下定义作用于这些元素的新操作。</p>
-<p>单分派和双重分派的区别就是：程序在选择重载方法和重写方法时，如果两种情况都是动态分派的，则称之为双重分派；如果其中一种情况是动态分派，另一种是静态分派，则称之为单分派。</p>
-<p><strong>用重写方法的动态分派特性将重载方法也模拟成动态分派</strong>。</p>
- 
-      <!-- reward -->
-      
-    </div>
-    
-
-    <!-- copyright -->
-    
-    <footer class="article-footer">
-       
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/" rel="tag">读书笔记</a></li></ul>
-
     </footer>
   </div>
 
