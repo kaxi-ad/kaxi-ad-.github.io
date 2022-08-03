@@ -427,13 +427,47 @@
 
 <p>在InnoDB存储引擎中，自增长值得列必须是索引，同时必须是索引的第一个列。</p>
 <h3 id="5、外键和锁"><a href="#5、外键和锁" class="headerlink" title="5、外键和锁"></a>5、外键和锁</h3><p>​		在InnoDB存储引擎中，对于一个外键列，如果没有显式地对这个列加索引，InnoDB存储引擎自动对其加一个索引，因为这样可以避免表锁———这比Oracle数据库做得好。</p>
+<p>​		对于外键值的插入或更新，首先需要查询父表中的记录，即SELECT父表。但是对于父表的SELECT操作，不是使用一致性非锁定读方式，因为这样会发生数据不一致问题，因此这时使用的是SELECT···LOCK IN SHARE MODE方式，主动对父表加S锁。</p>
+<p>示例：</p>
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>BEGIN</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>DELETE FROM parent WHERE id&#x3D;3;</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>BEGIN</td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>INSERT INTO child SELECT 2,3#第二列是外键，执行该句被阻塞（waiting）</td>
+</tr>
+</tbody></table>
 <h2 id="四、锁的算法"><a href="#四、锁的算法" class="headerlink" title="四、锁的算法"></a>四、锁的算法</h2><h3 id="1、行锁的3种算法"><a href="#1、行锁的3种算法" class="headerlink" title="1、行锁的3种算法"></a>1、行锁的3种算法</h3><p>InnoDB存储引擎有3种行锁的算法，分别是：</p>
 <ul>
 <li>Record Lock：单个行记录上的锁</li>
 <li>Gap Lock：间隙锁，锁定一个范围，不包含记录本身</li>
 <li>Next-Key Lock：Gap Lock+Record Lock，锁定一个范围，并且锁定记录本身</li>
 </ul>
-<p>Record Lock总是会去锁住索引记录，如果InnoDB存储引擎表在建立的时候没有设置任何一个索引，那么这时InnoDB存储引擎会使用隐式的主键来锁定。</p>
+<p>Record Lock总是会去锁住<strong>索引</strong>记录，如果InnoDB存储引擎表在建立的时候没有设置任何一个索引，那么这时InnoDB存储引擎会使用隐式的主键来锁定。</p>
+<blockquote>
+<p><strong>使用算法需要添加索引</strong></p>
+</blockquote>
 <p>InnoDB对于行的查询都是采用Next-Key Lock算法。</p>
 <p>例如：</p>
 <p>​	一个索引有10，11，13和20，区间：</p>
@@ -505,11 +539,288 @@
 <td></td>
 </tr>
 </tbody></table>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> @<span class="variable">@tx</span>_isolation<span class="operator">=</span><span class="number">0</span> #设置事务隔离级别</span><br></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">set</span> session tx_isolation<span class="operator">=</span><span class="number">0</span> #设置事务隔离级别</span><br></pre></td></tr></table></figure>
 
 
 
 <p>锁定由Next-Key Lock算法降级为了Record Lock，从而提高应用的并发性。</p>
+<h2 id="五、锁问题"><a href="#五、锁问题" class="headerlink" title="五、锁问题"></a>五、锁问题</h2><h3 id="1、脏读"><a href="#1、脏读" class="headerlink" title="1、脏读"></a>1、脏读</h3><p>脏数据：指事务对缓冲池中行记录的修改，并且还没有被提交（commit）。</p>
+<p>如果读到了脏数据，即一个事务可以读到另外一个事务中未提交的数据，显然违反了数据库隔离性。</p>
+<p>脏读：指的是不同的事务下，当前事务可以读到另外事务未提交的数据，可以读到脏数据。</p>
+<p>示例：</p>
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>set session tx_isolation&#x3D;0;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td></td>
+<td>set session tx_isolation&#x3D;0;</td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>begin;</td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>mysql&gt; select * from l;<br>a<br>1<br>2</td>
+</tr>
+<tr>
+<td>5</td>
+<td>insert into l select 3;</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td></td>
+<td>mysql&gt; select * from l;<br/>a<br/>1<br/>2<br>3</td>
+</tr>
+</tbody></table>
+<p>脏读发生条件需要事务隔离级别为READ UNCOMMITTED</p>
+<ul>
+<li>InnoDB存储引擎默认的事务隔离级别为<strong>READ REPEATABLE</strong></li>
+<li>Microsoft SQL Server数据库为READ COMMITTED</li>
+<li>Oracle数据库也是READ COMMITTED</li>
+</ul>
+<h3 id="2、不可重复读"><a href="#2、不可重复读" class="headerlink" title="2、不可重复读"></a>2、不可重复读</h3><p>不可重复读和脏读的区别是：脏读是读到未提交的数据，而不可重复读读到的却是已经提交的数据。</p>
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>set session tx_isolation&#x3D;1</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td></td>
+<td>set session tx_isolation&#x3D;1</td>
+</tr>
+<tr>
+<td>3</td>
+<td>begin</td>
+<td>begin</td>
+</tr>
+<tr>
+<td>4</td>
+<td>mysql&gt; select * from l;<br>a<br>1</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td></td>
+<td>insert into l select 2;</td>
+</tr>
+<tr>
+<td>6</td>
+<td></td>
+<td>commit;</td>
+</tr>
+<tr>
+<td>7</td>
+<td>mysql&gt; select * from l;<br/>a<br/>1<br>2</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>隔离级别READ COMMITTED下允许不可重复读现象</p>
+<p>在NextKey Lock算法下，对于索引的扫描，不仅是锁住扫描到的所有，还所著索引覆盖的范围(gap)。</p>
+<p>InnoDB存储引擎的默认事务隔离级别是READ REPEATABLE，采用Next-Key Lock算法，避免了不可重复读现象。</p>
+<h3 id="3、丢失更新"><a href="#3、丢失更新" class="headerlink" title="3、丢失更新"></a>3、丢失更新</h3><p>一个事务的更新操作被另一个事务的更新操作覆盖，导致数据结果不一致。</p>
+<p>示例：</p>
+<ul>
+<li>事务T1将行记录r更新为v1，但是事务T1并未提交</li>
+<li>与此同时，事务T2将行记录r更新为v2，事务T2未提交</li>
+<li>事务T1提交。</li>
+<li>事务T2提交。</li>
+</ul>
+<p>在当前数据库的任何隔离级别下，都不会导致数据库理论意义上丢失更新问题。因为即使是READ UNCOMMITTED的事务隔离级别，对于行的DML操作，需要对行或其他粗粒度级别的对象加锁。</p>
+<p><strong>逻辑意义的丢失更新问题</strong></p>
+<p>示例：</p>
+<ul>
+<li>事务T1查询一行数据，放入本地内存，并显示给一个终端用户User1.</li>
+<li>事务T2也查询改行数据，并将取得的数据显示给终端用户User2</li>
+<li>User1修改这行记录，更新数据库并提交。</li>
+<li>User2修改这行记录，更新数据库并提交。</li>
+</ul>
+<p>（重点）需要在数据库层解决这个问题，避免任何可能发生丢失更新的情况。</p>
+<blockquote>
+<p>最好将操作串行化</p>
+</blockquote>
+<p>处理方法：</p>
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>select cash into @cash from account where user &#x3D;pUser for update;</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>select cash into @cash from account where user &#x3D;pUser for update;#等待</td>
+</tr>
+<tr>
+<td></td>
+<td>···</td>
+<td>···</td>
+</tr>
+<tr>
+<td>m</td>
+<td>update account set cash&#x3D;@cash-9000 where user&#x3D;pUser;</td>
+<td></td>
+</tr>
+<tr>
+<td>m+1</td>
+<td>commit;</td>
+<td></td>
+</tr>
+<tr>
+<td>m+2</td>
+<td></td>
+<td>update account set cash&#x3D;@cash-1 where user&#x3D;pUser;</td>
+</tr>
+<tr>
+<td>m+3</td>
+<td></td>
+<td>commit;</td>
+</tr>
+</tbody></table>
+<h2 id="六、阻塞"><a href="#六、阻塞" class="headerlink" title="六、阻塞"></a>六、阻塞</h2><blockquote>
+<p>因为不同锁之间的兼容性关系，有些时刻一个事务中的锁需要等待另一个事务中的锁释放它所占用的资源</p>
+</blockquote>
+<p>参数innodb_lock_wait_timeout</p>
+<ul>
+<li>用来控制等待的时间（默认50秒）</li>
+<li>动态的</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">set</span> @<span class="variable">@innodb</span>_lock_wait_timeout<span class="operator">=</span><span class="number">60</span>;</span><br><span class="line">Query OK, <span class="number">0</span> <span class="keyword">rows</span> affected (<span class="number">0.01</span> sec)</span><br></pre></td></tr></table></figure>
+
+
+
+<p>参数innodb_rollback_on_timeout</p>
+<ul>
+<li>设定是否在等待超时时对进行中的事务进行回滚操作（默认是OFF，不回滚）</li>
+<li>静态，不可在启动时修改</li>
+</ul>
+<blockquote>
+<p>默认情况下InnoDB存储引擎不会回滚超时引发的错误异常</p>
+</blockquote>
+<h2 id="七、死锁"><a href="#七、死锁" class="headerlink" title="七、死锁"></a>七、死锁</h2><h3 id="1、死锁的概念"><a href="#1、死锁的概念" class="headerlink" title="1、死锁的概念"></a>1、死锁的概念</h3><p><strong>死锁指两个或两个以上的事务在执行过程中，因争夺锁资源而造成的一种互相等待的现象。</strong></p>
+<h3 id="2、死锁概率"><a href="#2、死锁概率" class="headerlink" title="2、死锁概率"></a>2、死锁概率</h3><ul>
+<li>系统中事务的数量（n），数量越多发生死锁的概率越大</li>
+<li>每个事务操作的数量（r），每个事务操作的数量越多，发生死锁的概率越大</li>
+<li>操作数据的集合（R），越小则发生死锁的概率越大</li>
+</ul>
+<h3 id="3、死锁的示例"><a href="#3、死锁的示例" class="headerlink" title="3、死锁的示例"></a>3、死锁的示例</h3><p>1213错误提示，表示事务发生了死锁。</p>
+<h4 id="（1）AB-BA死锁："><a href="#（1）AB-BA死锁：" class="headerlink" title="（1）AB-BA死锁："></a>（1）AB-BA死锁：</h4><table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>mysql&gt; select * from l where a&#x3D;2 for update;<br>a<br>2</td>
+<td>begin;</td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>mysql&gt; select * from l where a&#x3D;5 for update;<br>a<br>5</td>
+</tr>
+<tr>
+<td>4</td>
+<td>mysql&gt; select * from l where a&#x3D;5 for update;<br>#等待</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td></td>
+<td>mysql&gt; select * from l where a&#x3D;2 for update;<br>ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction</td>
+</tr>
+</tbody></table>
+<p>InnoDB存储引擎并不会回滚大部分的错误异常，但是死锁除外。发现死锁后，InnoDB存储引擎会马上回滚一个事务。因此如果在应用程序中捕获了1213错误，并不需要对其进行回滚。</p>
+<h4 id="（2）持有X锁，等待队列存在S锁"><a href="#（2）持有X锁，等待队列存在S锁" class="headerlink" title="（2）持有X锁，等待队列存在S锁"></a>（2）持有X锁，等待队列存在S锁</h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">create</span> <span class="keyword">table</span> l (</span><br><span class="line">    a <span class="type">int</span> <span class="keyword">primary</span> key</span><br><span class="line">)engine<span class="operator">=</span>InnoDB</span><br><span class="line">inset <span class="keyword">into</span> l <span class="keyword">values</span>(<span class="number">1</span>);</span><br><span class="line">inset <span class="keyword">into</span> l <span class="keyword">values</span>(<span class="number">2</span>);</span><br><span class="line">inset <span class="keyword">into</span> l <span class="keyword">values</span>(<span class="number">5</span>);</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>会话A</th>
+<th>会话B</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>begin;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td></td>
+<td>begin;</td>
+</tr>
+<tr>
+<td>3</td>
+<td>select * from l where a&#x3D;5 for update;</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>select * from l where a&lt;&#x3D;5 lock in share mode;<br>–等待</td>
+</tr>
+<tr>
+<td>5</td>
+<td>insert into t values(4);<br>ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td></td>
+<td>–事务获得锁，正常运行</td>
+</tr>
+</tbody></table>
+<p>会话A持有X锁，会话B之后持有S锁，进入等待，此时会话A插入记录4，发生死锁。原因是会话A持有记录5的X锁，会话B持有记录1，记录2的S锁，等待记录5的S锁，此时会话A插入记录4，会话B在持有记录5的S锁之后，还要获得记录4的S锁，不合理。</p>
+<p>因此，InnoDB存储引擎主动选择死锁。回滚的是undo log记录大的事务。</p>
+<h2 id="八、锁升级"><a href="#八、锁升级" class="headerlink" title="八、锁升级"></a>八、锁升级</h2><blockquote>
+<p><strong>InnoDB存储引擎不存在锁升级的问题。</strong></p>
+</blockquote>
+<p>因为其不是根据每个记录来产生行锁的，相反，其根据每个事务访问的每个页对锁进行管理的，采用的是位图的方式。因此不管一个事务锁住页中一个记录还是多个记录，开销通常是一致的。</p>
  
       <!-- reward -->
       
