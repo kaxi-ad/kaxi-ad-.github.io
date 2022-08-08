@@ -154,6 +154,174 @@
     
     
     <article
+  id="post-Mysql事务"
+  class="article article-type-post"
+  itemscope
+  itemprop="blogPost"
+  data-scroll-reveal
+>
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2022/08/01/Mysql%E4%BA%8B%E5%8A%A1/"
+    >Mysql事务</a> 
+</h2>
+ 
+
+      
+    </header>
+     
+    <div class="article-meta">
+      <a href="/2022/08/01/Mysql%E4%BA%8B%E5%8A%A1/" class="article-date">
+  <time datetime="2022-08-01T09:47:25.000Z" itemprop="datePublished">2022-08-01</time>
+</a> 
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a>
+  </div>
+   
+    </div>
+      
+    <div class="article-entry" itemprop="articleBody">
+       
+  <h1 id="Mysql事务"><a href="#Mysql事务" class="headerlink" title="Mysql事务"></a>Mysql事务</h1><blockquote>
+<p>事务会把数据库从一种一致状态转换为另一种一致状态</p>
+</blockquote>
+<ul>
+<li>原子性（atomicity）</li>
+<li>一致性（consistency）</li>
+<li>隔离性（isolation）</li>
+<li>持久型（durability）</li>
+</ul>
+<p>锁保证事务的隔离性</p>
+<h2 id="一、认识事务"><a href="#一、认识事务" class="headerlink" title="一、认识事务"></a>一、认识事务</h2><h3 id="1、概述"><a href="#1、概述" class="headerlink" title="1、概述"></a>1、概述</h3><blockquote>
+<p>事务是访问并更新数据库中各种数据项的一个程序执行单元</p>
+</blockquote>
+<ul>
+<li>A（Atomicity）原子性</li>
+</ul>
+<p>原子性指整个数据库事务是不可分割的工作单位。只有使事务中所有的数据库操作都执行成功，才算整个事务成功。</p>
+<ul>
+<li>C（consistency）一致性</li>
+</ul>
+<p>一致性指事务将数据库从一种状态转变为下一种一致的状态。事务开始前后，数据库的完整性约束没有被破坏。</p>
+<ul>
+<li>I（isolation）隔离性</li>
+</ul>
+<p>事务的隔离性要求每个读写事务的对象对其他事务的操作对象能相互分离，即该事务提交前对其他事务都不可见，通常这是用锁来实现。</p>
+<ul>
+<li>D（durability）持久性</li>
+</ul>
+<p>事务一旦提交，结果永久性的。即使发生宕机等故障，数据库也能将数据恢复。</p>
+<h3 id="2、分类"><a href="#2、分类" class="headerlink" title="2、分类"></a>2、分类</h3><ul>
+<li><p>扁平事务（Flat Transactions）</p>
+</li>
+<li><p>带有保存点的扁平事务（Flat Transactions with Savepoints）</p>
+</li>
+<li><p>链事务（Chained Transactions）</p>
+</li>
+<li><p>嵌套事务（Nested Transactions）</p>
+</li>
+</ul>
+<h4 id="扁平事务"><a href="#扁平事务" class="headerlink" title="扁平事务"></a>扁平事务</h4><p>​		所有操作处于同一层次，其次由BEGIN WORK开始，由COMMIT WORK或者ROLLBACK WORK结束，其间的操作是原子的，要么都执行，要么都回滚。</p>
+<p>​		主要限制，不能提交或回滚事务的某一部分，或分几个步骤提交。</p>
+<p>​		<strong>带有保存点的扁平事务</strong></p>
+<p>​		保存点（Savepoint）用来通知系统应该记住事务当前的状态，以便当之后发生错误时，事务能回到保存点当时的状态。</p>
+<p>​		对于扁平的事务，其隐式地设置了一个保存点。然后在整个事务中，只有这一个保存点，因此，回滚只能回滚到事务开始时的状态。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">保存点用SAVE WORK函数建立</span><br><span class="line">SAVE　WORK：２</span><br><span class="line">回滚保存点２</span><br><span class="line">ROLL　BACK　WORK：２</span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/MySql%E4%BA%8B%E5%8A%A1/1.jpg" alt="示例"></p>
+<h4 id="链事务"><a href="#链事务" class="headerlink" title="链事务"></a>链事务</h4><blockquote>
+<p>可视为保存点模式的一种变种。</p>
+</blockquote>
+<p>思想：在提交一个事务时，释放不需要的数据对象，将必要的处理上下文隐式地传给下一个要开始的事务。</p>
+<p>注：提交事务操作和开始下一个事务操作将合并为一个原子操作。下一个事务将看到上一个事务的结果。</p>
+<p><img src="/images/MySql%E4%BA%8B%E5%8A%A1/2.jpg" alt="链事务"></p>
+<p>与带有保存点的扁平事务不同处：</p>
+<ul>
+<li>带有保存点的扁平事务能回滚到任意正确的保存点。链事务中的回滚仅限于当前的事务，即只能恢复到最近一个的保存点</li>
+<li>对于锁的处理，两者也不相同。链事务在执行COMMIT后即释放了当前事务所持有的锁，而带有保存点的扁平事务不影响迄今为止所持有的锁。</li>
+</ul>
+<h4 id="嵌套事务"><a href="#嵌套事务" class="headerlink" title="嵌套事务"></a>嵌套事务</h4><p>是一个层次结构框架。由一个顶层事务控制着各个层次的事务。</p>
+<p><img src="/images/MySql%E4%BA%8B%E5%8A%A1/3.jpg" alt="嵌套事务"></p>
+<h4 id="分布式事务"><a href="#分布式事务" class="headerlink" title="分布式事务"></a>分布式事务</h4><p>通常是一个在分布式环境下运行的扁平事务，因此需要根据数据所在位置访问网络中的不同节点。</p>
+<p>​		对于InnoDB存储引擎来说，其支持扁平事务、带有保存点的事务、链事务、分布式事务。对于嵌套事务，并不原生支持。</p>
+<h2 id="三、事务控制语句"><a href="#三、事务控制语句" class="headerlink" title="三、事务控制语句"></a>三、事务控制语句</h2><ul>
+<li>START TRANSACTION | BEGIN：显式地开启一个事务</li>
+<li>COMMIT：最简形式COMMIT，详细形式COMMIT WORK，二者几乎等价。COMMIT会提交事务，并使得已对数据库做地所有修改成为永久性地。</li>
+<li>ROLLBACK：最简形式，ROLLBACK。也可改写为ROLLBACK　WORK，几乎等价。回滚会结束用户地事务，并撤销正在进行地所有未提交地修改。</li>
+<li>SAVEPOINT identifier:SAVEPOINT允许在事务中创建一个保存点，一个事务中可以有多个SAVEPOINT；</li>
+<li>RELEASE　SAVEPOINT　identifier：删除一个事务地保存点，当没有一个保存点执行这句语句时，会抛出一个异常。</li>
+<li>ROLLBACK　TO［SAVEPOINT］identifier:这个语句与SAVEPOINT命令一起使用。可以把事务回滚到标记点，而不回滚在此标记点之前地任何工作。</li>
+<li>SET TRANSACTION：设置事务隔离级别。READ UNCOMMITTED、READ COMMITTED、REPEATABLE READ、SERIALIZABLE</li>
+</ul>
+<p>COMMIT和COMMIT WORK语句基本是一致地，提交事务。不同之处在于COMMIT WORK用来控制事务结束后地行为是CHAIN还是RELEASE的。如果是CHAIN方式，那么事务就变成了链事务。</p>
+<p><strong>completion_type</strong></p>
+<p>该参数默认为0，表示没有任何操作。在这种设置下COMMIT和COMMIT WORK是完全等价的。当参数completion_type的值为1时，COMMIT WORK等同于COMMIT AND CHAIN，表示马上自动开启一个相同隔离级别的事务</p>
+<p>例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; begin;</span><br><span class="line">Query OK, 0 rows affected (0.01 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; insert into l select 3;</span><br><span class="line">Query OK, 1 row affected (0.01 sec)</span><br><span class="line">Records: 1  Duplicates: 0  Warnings: 0</span><br><span class="line"></span><br><span class="line">mysql&gt; commit work;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; insert into l select 4;</span><br><span class="line">Query OK, 1 row affected (0.01 sec)</span><br><span class="line">Records: 1  Duplicates: 0  Warnings: 0</span><br><span class="line"></span><br><span class="line">mysql&gt; insert into l select 4;</span><br><span class="line">ERROR 1062 (23000): Duplicate entry &#x27;4&#x27; for key &#x27;PRIMARY&#x27;</span><br><span class="line">mysql&gt; rollback;</span><br><span class="line">Query OK, 0 rows affected (0.01 sec)</span><br><span class="line"></span><br><span class="line"># 回滚之后只有3没有4</span><br></pre></td></tr></table></figure>
+
+<p>参数completion_type为2时，COMMIT WORK等同于COMMIT AND RELEASE。事务提交后会自动断开与服务器的连接。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; set @@completion_type=2;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; begin;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; insert into l select 4;</span><br><span class="line">Query OK, 1 row affected (0.01 sec)</span><br><span class="line">Records: 1  Duplicates: 0  Warnings: 0</span><br><span class="line"></span><br><span class="line">mysql&gt; commit work;</span><br><span class="line">Query OK, 0 rows affected (0.01 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; select @@version\G;</span><br><span class="line">ERROR 2013 (HY000): Lost connection to MySQL server during query</span><br><span class="line">ERROR:</span><br><span class="line">No query specified</span><br><span class="line">#提交后断开连接</span><br></pre></td></tr></table></figure>
+
+<p>InnoDB存储引擎中的事务都是原子的。</p>
+<ul>
+<li>构成事务的每条语句都会提交（成为永久）</li>
+<li>或者所有语句都回滚</li>
+</ul>
+<p>虽然有ROLLBACK，但其并不是真正的结束一个事务，因此即使执行了<strong>ROLLBACK TO SAVEPOINT</strong>，之后也需要显式地运行COMMIT或ROLLBACK命令。</p>
+<blockquote>
+<p>ROLLBACK TO SAVEPOINT命令并不真正地结束事务</p>
+</blockquote>
+<h2 id="四、隐式提交的SQL语句"><a href="#四、隐式提交的SQL语句" class="headerlink" title="四、隐式提交的SQL语句"></a>四、隐式提交的SQL语句</h2><p>以下语句会产生一个隐式的提交操作，执行完语句后，会有隐式的COMMIT操作</p>
+<ul>
+<li>DDL语句：ALTER DATEBASE … UPGRADE DATA DIRECTORY NAME，ALTER EVENT，ALTER PROCEDURE，ALTER TABLE，ALTER VIEW，CREATE DATABASE，CREATE EVENT，CREATE INDEX，CREATE INDEX，CREATE PROCEDURE…</li>
+<li>用来隐式地修改MySQL架构的操作:CREATE USER、DROP USER、GRANT、RENAME USER、REVOKE、SET PASSWORD</li>
+<li>管理语句:ANALYZE TABLE…</li>
+<li>注：TRUNCATE TABLE语句是DDL，虽然结果与DELETE相同，但是不能被回滚的</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; SELECT * FROM l\G;</span><br><span class="line">*************************** 1. row ***************************</span><br><span class="line">a: 1</span><br><span class="line">*************************** 2. row ***************************</span><br><span class="line">a: 2</span><br><span class="line">2 rows in set (0.03 sec)</span><br><span class="line"></span><br><span class="line">ERROR:</span><br><span class="line">No query specified</span><br><span class="line"></span><br><span class="line">mysql&gt; BEGIN;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; TRUNCATE TABLE L;</span><br><span class="line">Query OK, 0 rows affected (0.12 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; ROLLBACK;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">mysql&gt; SELECT * FROM l\G;</span><br><span class="line">Empty set (0.01 sec)</span><br><span class="line"></span><br><span class="line">ERROR:</span><br><span class="line">No query specified</span><br></pre></td></tr></table></figure>
+
+<h2 id="五、对于事务操作的统计"><a href="#五、对于事务操作的统计" class="headerlink" title="五、对于事务操作的统计"></a>五、对于事务操作的统计</h2><p>InnoDB存储引擎是支持事务的</p>
+<p>因此InnoDB存储引擎的应用需要在考虑<strong>每秒请求数</strong>（Question Per Second,QPS）的同时，应该关注每秒<strong>事务处理的能力</strong>(Transaction PerSecond,TPS)</p>
+<p>计算TPS方式：(com_commit+com_rollback)&#x2F;time</p>
+<p>前提：所有事务必须是显式提交的，如果存在隐式地提交和回滚（默认autocommit&#x3D;1），不会计算到com_commit和com_rollback变量中</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; SHOW GLOBAL STATUS LIKE &#x27;com_commit&#x27;\G;</span><br><span class="line">*************************** 1. row ***************************</span><br><span class="line">Variable_name: Com_commit</span><br><span class="line">        Value: 10878</span><br><span class="line">1 row in set (0.03 sec)</span><br><span class="line"></span><br><span class="line">ERROR:</span><br><span class="line">No query specified</span><br><span class="line"></span><br><span class="line">mysql&gt; SHOW GLOBAL STATUS LIKE &#x27;com_rollback&#x27;\G;</span><br><span class="line">*************************** 1. row ***************************</span><br><span class="line">Variable_name: Com_rollback</span><br><span class="line">        Value: 19</span><br><span class="line">1 row in set (0.01 sec)</span><br><span class="line"></span><br><span class="line">ERROR:</span><br><span class="line">No query specified</span><br><span class="line"></span><br><span class="line">mysql&gt;</span><br></pre></td></tr></table></figure>
+
+<h2 id="六、事务的隔离级别"><a href="#六、事务的隔离级别" class="headerlink" title="六、事务的隔离级别"></a>六、事务的隔离级别</h2><ul>
+<li>READ UNCOMMITTED</li>
+<li>READ COMMITTED</li>
+<li>REPEATABLE READ</li>
+<li>SERIALIZABLE</li>
+</ul>
+<p>InnoDB引擎在REPEATABLE READ事务隔离级别下，使用Next-Key Lock锁的算法,因此避免幻读产生。</p>
+<p>在SERIALABLE的事务隔离级别，InnoDB存储引擎会对每个SELECT语句后自动加上LOCK IN SHARE MODE,为每个读取操作加一个共享锁</p>
+<h2 id="七、分布式事务"><a href="#七、分布式事务" class="headerlink" title="七、分布式事务"></a>七、分布式事务</h2><h3 id="1、MySQL数据库分布式事务"><a href="#1、MySQL数据库分布式事务" class="headerlink" title="1、MySQL数据库分布式事务"></a>1、MySQL数据库分布式事务</h3><p>分布式事务：允许多个独立的事务资源参与到一个全局的事务中。</p>
+<p>在使用分布式事务时，Inn哦DB存储引擎的事务隔离级别必须设置为SERIALIZABLE。</p>
+<p>分布式事务使用两段式提交（two-phase commit）的方式</p>
+ 
+      <!-- reward -->
+      
+    </div>
+    
+
+    <!-- copyright -->
+    
+    <footer class="article-footer">
+       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/mysql/" rel="tag">mysql</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E4%BA%8B%E5%8A%A1/" rel="tag">事务</a></li></ul>
+
+    </footer>
+  </div>
+
+    
+ 
+    
+</article>
+
+    
+    <article
   id="post-Mysql锁"
   class="article article-type-post"
   itemscope
@@ -2631,66 +2799,6 @@
        
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/" rel="tag">并发编程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AF%BB%E4%B9%A6%E7%AC%94%E8%AE%B0/" rel="tag">读书笔记</a></li></ul>
 
-    </footer>
-  </div>
-
-    
- 
-    
-</article>
-
-    
-    <article
-  id="post-hello-world"
-  class="article article-type-post"
-  itemscope
-  itemprop="blogPost"
-  data-scroll-reveal
->
-  <div class="article-inner">
-    
-    <header class="article-header">
-       
-<h2 itemprop="name">
-  <a class="article-title" href="/2022/07/05/hello-world/"
-    >Hello World</a> 
-</h2>
- 
-
-      
-    </header>
-     
-    <div class="article-meta">
-      <a href="/2022/07/05/hello-world/" class="article-date">
-  <time datetime="2022-07-05T07:59:50.719Z" itemprop="datePublished">2022-07-05</time>
-</a>    
-    </div>
-      
-    <div class="article-entry" itemprop="articleBody">
-       
-  <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
- 
-      <!-- reward -->
-      
-    </div>
-    
-
-    <!-- copyright -->
-    
-    <footer class="article-footer">
-       
     </footer>
   </div>
 
