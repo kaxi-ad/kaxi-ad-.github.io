@@ -84,7 +84,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-quill-pen-line"></i>
             <span class="post-meta-item-text"> 字数统计:</span>
-            <span class="post-count">2.5k</span>
+            <span class="post-count">6.9k</span>
         </span>
     </span>
 
@@ -93,7 +93,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-book-open-line"></i>
             <span class="post-meta-item-text"> 阅读时长≈</span>
-            <span class="post-count">8 分钟</span>
+            <span class="post-count">25 分钟</span>
         </span>
     </span>
 </div>
@@ -124,13 +124,72 @@
 <li>额外的占用物理空间</li>
 <li>对表中数据进行增加、删除和修改的时候，索引也要动态的维护，降低了数据的维护速度。</li>
 </ul>
-<h2 id="三、如何使用索引（how）"><a href="#三、如何使用索引（how）" class="headerlink" title="三、如何使用索引（how）"></a>三、如何使用索引（how）</h2><p>InnoDB存储引擎支持以下几种常见的索引：</p>
-<ul>
-<li>B+树索引</li>
-<li>全文索引</li>
-<li>哈希索引</li>
-</ul>
+<h2 id="三、如何使用索引（how）"><a href="#三、如何使用索引（how）" class="headerlink" title="三、如何使用索引（how）"></a>三、如何使用索引（how）</h2><blockquote>
 <p>B+树索引就是传统意义上的索引，目前关系型数据库系统中查找最为常用和最为有效的索引。</p>
+</blockquote>
+<h3 id="1、索引类型"><a href="#1、索引类型" class="headerlink" title="1、索引类型"></a>1、索引类型</h3><p><strong>索引存储结构划分</strong>：B Tree索引、Hash索引、FULLTEXT全文索引、R Tree索引</p>
+<p><strong>从应用层次划分</strong>：普通索引、唯一索引、主键索引、复合索引</p>
+<h4 id="（1）普通索引"><a href="#（1）普通索引" class="headerlink" title="（1）普通索引"></a>（1）普通索引</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">CREATE INDEX &lt;索引名字&gt; ON tablename(字段名)</span><br><span class="line">ALTER TABLE tablename ADD INDEX[索引的名字](字段名);</span><br><span class="line">CREATE TABLE tablename ([...],INDEX [索引的名字](字段名))</span><br></pre></td></tr></table></figure>
+
+<h4 id="（2）唯一索引"><a href="#（2）唯一索引" class="headerlink" title="（2）唯一索引"></a>（2）唯一索引</h4><p>索引字段的值必须唯一，允许有空值。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">CREATE UNIQUE INDEX &lt;索引的名字&gt; ON tablename(字段名);</span><br><span class="line">ALTER TABLE tablename ADD UNIQUE INDEX[索引的名字](字段名);</span><br><span class="line">CREATE TABLE tablename([...],UNIQUE[索引的名字](字段名))</span><br></pre></td></tr></table></figure>
+
+<h4 id="（3）主键索引"><a href="#（3）主键索引" class="headerlink" title="（3）主键索引"></a>（3）主键索引</h4><p>特殊的唯一索引，不允许有控制，每个表只能有一个主键。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE tablename([...],PRIMARY KEY(字段名));</span><br><span class="line">ALTER TABLE tablename ADD PRIMARY KEY(字段名);</span><br></pre></td></tr></table></figure>
+
+<h4 id="（4）复合索引"><a href="#（4）复合索引" class="headerlink" title="（4）复合索引"></a>（4）复合索引</h4><p>相比多个单一索引，复合索引所需的开销更小。</p>
+<p>窄索引指索引列为1-2列的索引，宽索引指超过2列的索引，设计索引的重要原则就是能用窄索引不用宽索引。因为窄索引往往比组合索引更有效</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">CREATE INDEX&lt;索引的名字&gt; ON tablename(字段名1,字段名2...);</span><br><span class="line">ALTER TABLE tablename ADD INDEX[索引的名字](字段名1,字段名2...);</span><br><span class="line">CREATE TABLE tablename([...],INDEX[索引的名字](字段名1,字段名2...));</span><br></pre></td></tr></table></figure>
+
+<p>注：复合索引字段是有顺序的</p>
+<h4 id="（5）全文索引"><a href="#（5）全文索引" class="headerlink" title="（5）全文索引"></a>（5）全文索引</h4><p>使用情景：查询操作再数据量比较少时，可以使用like模糊查询，但是对于大量的文本数据检索，效率很低。如果使用全文索引，查询速度回避like快很多倍。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">CREATE FULLTEXT INDEX&lt;索引的名字&gt; ON tablename(字段名);</span><br><span class="line">ALTER TABLE tablename ADD FULLTEXT[索引的名字](字段名);</span><br><span class="line">CREATE TABLE tablename([...],FULLTEXT KEY[索引的名字](字段名));</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">#查询语句</span><br><span class="line">select * from user where match(name) against(&#x27;aaa&#x27;);</span><br></pre></td></tr></table></figure>
+
+<p>注意事项：</p>
+<ul>
+<li>全文索引必须在字符串、文本字段上建立</li>
+<li>必须在最小字符和最大字符之间才会有效（innodb:3-84；myisam:4-84）</li>
+<li>全文索引字段值要进行切词处理，按syntax字符进行切割，例如b+aaa,切分成b和aaa</li>
+<li>全文索引匹配查询，默认使用的是等值匹配，例如a匹配a，不会匹配ab,ac。如果想匹配可以在布尔模式下搜索a*</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">select * from user where match(name) against(&#x27;a*&#x27; in blooean mode);</span><br><span class="line">#+/- 运算符代表单词必须出现或一定不出现时方能匹配</span><br><span class="line">SELECT * FROM articles WHERE MATCH (title,body)</span><br><span class="line">    AGAINST (&#x27;+MySQL -YourSQL&#x27; IN BOOLEAN MODE);</span><br></pre></td></tr></table></figure>
+
+<h3 id="2、索引原理"><a href="#2、索引原理" class="headerlink" title="2、索引原理"></a>2、索引原理</h3><blockquote>
+<p>存储引擎用于快速查找记录的一种数据结构</p>
+</blockquote>
+<h4 id="（1）Hash结构"><a href="#（1）Hash结构" class="headerlink" title="（1）Hash结构"></a>（1）Hash结构</h4><p>底层实现由Hash表实现，根据键值&lt;key,value&gt;存储数据的value值，单个key查询，等值查询。</p>
+<p>Hash索引可以方便的提供等值查询，但是对于范围查询需要全表扫描。</p>
+<p>Hash索引在MySQL中Hash结构主要应用在Memory元素的Hash索引、InnoDB自适应哈希索引。</p>
+<p><strong>InnoDB自适应哈希索引</strong></p>
+<blockquote>
+<p>在使用Hash索引访问时，一次性查找就能定位数据，等值查询效率要优于B+Tree；</p>
+</blockquote>
+<p>​		InnoDB自适应哈希索引为了提升效率，InnoDB存储引擎会监控表上各个索引页的查询，当InnoDB注意到某些索引值访问非常频繁时，会在内存中基于B+Tree索引在创建一个哈希索引，是的内存中的B+Tree索引具备哈希索引的功能。</p>
+<p>即能够快速定值访问频繁访问的索引页。</p>
+<p>自动根据索引页访问的频率和模式自动地为某些热点页 建立哈希索引来加速访问。</p>
+<p>InnoDB自适应哈希索引的功能，用户只能选择开启或关闭功能，无法进行人工干涉。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">show engine innodb status\G;</span><br><span class="line">show variables like &#x27;%innodb_adaptive%&#x27;</span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="（2）B-Tree结构（重点）"><a href="#（2）B-Tree结构（重点）" class="headerlink" title="（2）B+Tree结构（重点）"></a>（2）B+Tree结构（重点）</h4><p>B-Tree结构</p>
+<ul>
+<li>索引值和data数据分布在整棵树结构中</li>
+<li>每个节点可以存放多个索引值及对应的data数据</li>
+<li>树节点的多个索引值从左到右升序排列</li>
+</ul>
+<p>B+Tree结构</p>
+<ul>
+<li>非叶子节点不存储data数据，只存储索引值，便于存储更多索引值。</li>
+<li>叶子节点包含了所有的索引值和data数据</li>
+<li>叶子节点用指针连接，提高区间的访问性能</li>
+</ul>
+<p><strong>为什么数据库存储使用b+树，而不是二叉树？</strong></p>
+<p>二叉树树高过高，每次查询都需要访问过多节点，即访问数据块过多造成磁盘IO过多影响性能。B+树一次随机io能拿出更多数据。</p>
+<p><strong>N叉树的N是多少？</strong></p>
+<p>InnoDB一个整数字段索引为例，N差不多是1200。MySql默认一个page为16k，假设主键，一个整数（bigint）字段索引的长度为8B，另外每个索引还跟着6B的指向其子树的指针;所以16KB&#x2F;14B ≈ 1170</p>
 <h2 id="四、B-树"><a href="#四、B-树" class="headerlink" title="四、B+树"></a>四、B+树</h2><p>​		B+树是为磁盘或其他直接存取辅助设备设计的一种平衡查找树。在B+树中，所有记录节点都是按键值的大小顺序存放在同一层的叶子节点上，由各叶子节点指针进行连接。</p>
 <p><img src="/images/MySql%E7%B4%A2%E5%BC%95/%E9%AB%98%E5%BA%A6%E4%B8%BA2%E7%9A%84B+tree.jpg" alt="高度为2的B+tree"></p>
 <h3 id="1、插入操作"><a href="#1、插入操作" class="headerlink" title="1、插入操作"></a>1、插入操作</h3><table>
@@ -290,6 +349,180 @@
 <p>可使用FORCXE INDEX强制使用某个索引</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">FROM</span> orderdetails FORCE INDEX(OrderID)</span><br><span class="line"><span class="keyword">WHERE</span> orderid<span class="operator">&gt;</span><span class="number">10000</span> <span class="keyword">and</span> orderid<span class="operator">&lt;</span><span class="number">102000</span>;</span><br></pre></td></tr></table></figure>
 
+<h2 id="八、索引分析与优化"><a href="#八、索引分析与优化" class="headerlink" title="八、索引分析与优化"></a>八、索引分析与优化</h2><h3 id="1、EXPLAN"><a href="#1、EXPLAN" class="headerlink" title="1、EXPLAN"></a>1、EXPLAN</h3><p>例如：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">EXPLAIN select * from user where id &lt; 3;</span><br></pre></td></tr></table></figure>
+
+<p>EXPALIN命令输出内容：</p>
+<ul>
+<li><p>select_type</p>
+<p>表示查询的类型</p>
+<ul>
+<li>SIMPLE：查询语句包不包含子查询或union</li>
+<li>PRIMARY：表示此查询是最外层查询</li>
+<li>UNION：此查询是UNION的第二个或后续的查询</li>
+<li>DEPENDENT UNION：UNION中的第二个或后续的查询语句，使用了外面查询结果</li>
+<li>UNION RESULT：UNION的结果</li>
+<li>SUBQUERY：SELECT子查询语句</li>
+<li>DEPENDENT SUBQUERY：SELECT子查询语句依赖外层查询的结果。</li>
+</ul>
+<p>最常见查询类型是SIMPLE，表示查询没有子查询也没有用到UNION查询</p>
+</li>
+<li><p><strong>type</strong></p>
+<p>存储引擎查询数据时采用的方式。通过它可以判断出查询是全表扫描还是基于索引的部分扫描。常用属性值如下，从上到下效率依次增强。</p>
+<ul>
+<li>ALL：表示全表扫描，性能最差。</li>
+<li>index：表示基于索引的全表扫描，先扫描索引再扫描全表数据</li>
+<li>range：表示使用索引范围查询。使用&gt;、&gt;&#x3D;、&lt;、&lt;&#x3D;、in等等。</li>
+<li>ref：表示使用非唯一索引进行单值查询</li>
+<li>eq_ref：一般情况下出现在多表join查询，表示前面表的每一个记录都只能匹配后面表的一行结果。</li>
+<li>const：表示使用主键或唯一索引做等值查询，常量查询。</li>
+<li>NULL：表示不用访问表，速度最快。</li>
+</ul>
+</li>
+<li><p>possible_keys</p>
+<p>查询时能够使用到的索引。注意并不一定会真正使用，显示的是索引名称。</p>
+</li>
+<li><p><strong>key</strong></p>
+<p>查询时真正使用到的索引，显示的是索引名称。</p>
+</li>
+<li><p><strong>rows</strong></p>
+<p>MySQL查询优化器会根据统计信息，估算SQL要查询到结果需要扫描多少行记录。rows越少效率越高。</p>
+</li>
+<li><p>key_len</p>
+<p>查询使用了索引的字节数量。可以判断是否全部使用了组合索引。</p>
+<p>计算规则：</p>
+<ul>
+<li><p>字符串类型</p>
+<p>字符串长度跟字符集有关：lation1&#x3D;1、gbk&#x3D;2、utf8&#x3D;3、utf8mb4&#x3D;4</p>
+<p>char(n)：n*字符集长度</p>
+<p>varchar(n)：n*字符集长度+2字节</p>
+</li>
+<li><p>数值类型：</p>
+<p>TINYINT：１个字节</p>
+<p>SMALLINT： 2个字节</p>
+<p>MEDIUMINT： 3个字节</p>
+<p>INT、 FLOAT： 4个字节</p>
+<p>BIGINT、 DOUBLE： 8个字节  </p>
+</li>
+<li><p>时间类型</p>
+<p>DATE：３个字节</p>
+<p>TIMESTAMP：４个字节</p>
+<p>DATETIME：８个字节</p>
+</li>
+<li><p>字段属性：</p>
+<p>NULL属性占用1个字节，如果一个字段设置了NOT NULL，则没有此项</p>
+</li>
+</ul>
+</li>
+<li><p><strong>Extra</strong></p>
+<p>Extra表示很多额外的信息，各种操作会在Extra提示相关信息，常⻅⼏种如下：</p>
+<p><strong>－Using where</strong><br>索引(age,name) select salary,age name from t;进⾏回表<br>表示查询需要通过索引回表查询数据。<br><strong>－Using index</strong><br>索引(age,name) select age name from t;可以使⽤覆盖索引<br>表示查询需要通过索引，索引就可以满⾜所需数据。<br><strong>－Using filesort</strong><br>表示查询出来的结果需要额外排序，数据量⼩在内存，⼤的话在磁盘，因此有Using filesort 建议优化。<br><strong>－Using temprorary</strong><br>查询使⽤到了临时表，⼀般出现于去重、分组等操作。</p>
+</li>
+</ul>
+<h3 id="2、回表查询"><a href="#2、回表查询" class="headerlink" title="2、回表查询"></a>2、回表查询</h3><p>​		InnoDB有聚集索引和辅助索引，聚集索引存储索引值和行数据，InnoDB必须要有，且只有一个。辅助索引的叶子节点存储主键值和索引值。通过辅助索引无法直接定位行记录，通常情况下，需要扫码两遍索引树。</p>
+<p>回表查询：先通过辅助索引查询主键值，再通过聚集索引查询行记录。性能比扫一遍索引树低。</p>
+<h3 id="3、覆盖索引-1"><a href="#3、覆盖索引-1" class="headerlink" title="3、覆盖索引"></a>3、覆盖索引</h3><p>explain的输出结果Extra字段为Using index时，能够出发索引覆盖。</p>
+<p>只需要在一棵索引树上就能获取SQL所需的所有列数据，无需回表，速度更快，就叫索引覆盖。</p>
+<p>实现索引覆盖：将被查询的字段，建立到组合索引</p>
+<h3 id="4、最左前缀原则"><a href="#4、最左前缀原则" class="headerlink" title="4、最左前缀原则"></a>4、最左前缀原则</h3><p>复合索引使用时遵循最左原则，查询中使用到最左侧列，查询就会使用到索引，如果从索引第二列开始查找，索引将失效。</p>
+<h3 id="5、LIKE查询"><a href="#5、LIKE查询" class="headerlink" title="5、LIKE查询"></a>5、LIKE查询</h3><p>MySQL在使用like模糊查询时，索引能不能起作用？</p>
+<p>回答：索引可以被使用，只有把%字符卸载后面才会用到索引</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">select * from user where name like &#x27;%o%&#x27;;//不起作用</span><br><span class="line">select * from user where name like &#x27;o%&#x27;;//起作用</span><br><span class="line">select * from user where name like &#x27;%o&#x27;;//不起作用</span><br></pre></td></tr></table></figure>
+
+<h3 id="6、NULL查询"><a href="#6、NULL查询" class="headerlink" title="6、NULL查询"></a>6、NULL查询</h3><p>如果MySQL表的某一列含有NULL值，那么该列索引是否有效？</p>
+<p>对于NULL来说，NULL是一个特殊的值，从概念上讲，NULL意味着“一个未知值”，处理方式与其他值不同。</p>
+<p>不能使用＝，＜，＞这样的运算符，对NULL做算术运算的结果都是NULL，count时　不会包括NULL行等。</p>
+<p>NULL比空字符串需要更多的存储空间等。</p>
+<blockquote>
+<p>不建议列上允许为NULL</p>
+</blockquote>
+<h3 id="7、索引与排序"><a href="#7、索引与排序" class="headerlink" title="7、索引与排序"></a>7、索引与排序</h3><blockquote>
+<p>filesort和index两种索引</p>
+</blockquote>
+<ul>
+<li><p>filesort先把结果查出，在缓存或磁盘进行排序，效率低。</p>
+<p>filesort有两种排序算法</p>
+<ul>
+<li><p>双路排序：两次磁盘扫描读取，第一次读取排序字段，然后排序；第二次读取其他字段数据</p>
+</li>
+<li><p>单路排序：从磁盘查询所需的所有列数据，然后再内存排序将结果返回。（如果查询数据超出缓存sort_buffer，会导致多次磁盘读取操作，并创建临时表，最后产生多次IO，增加负担）</p>
+<p>解决方式：少使用select *;增加sort_buffer_size容量和max_length_for_sort_data容量</p>
+</li>
+</ul>
+</li>
+<li><p>index指利用索引自动实现排序，不需另作排序操作，效率较高</p>
+</li>
+</ul>
+<p>Explain分析SQL，Extra属性显示</p>
+<table>
+<thead>
+<tr>
+<th>Extra</th>
+<th>意义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Using filesort</td>
+<td>使用filesort排序</td>
+</tr>
+<tr>
+<td>Using index</td>
+<td>覆盖索引</td>
+</tr>
+</tbody></table>
+<p>使用index排序情况</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ORDER BY子句索引列组合满足所有最左前列</span><br><span class="line">explain select id from user order by id;//对应(id)、(id,name)索引有效</span><br><span class="line"></span><br><span class="line">where子句+order by子句索引列组合满足所有最左前列</span><br><span class="line">explain select id from user where age=18 order by name;//对应(age,name)索引</span><br></pre></td></tr></table></figure>
+
+<p>使⽤filesort⽅式的排序  </p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">对索引列同时使⽤了ASC和DESC</span><br><span class="line">explain select id from user order by age asc,name desc; //对应(age,name)索引</span><br><span class="line"></span><br><span class="line">WHERE⼦句和ORDER BY⼦句满⾜最左前缀，但where⼦句使⽤了范围查询(例如&gt;、 &lt;、 in等)</span><br><span class="line">explain select id from user where age&gt;10 order by name; //对应(age,name)索引</span><br><span class="line"></span><br><span class="line">ORDER BY或者WHERE+ORDER BY索引列没有满⾜索引最左前列</span><br><span class="line">explain select id from user order by name; //对应(age,name)索引</span><br><span class="line"></span><br><span class="line">使⽤了不同的索引， MySQL每次只采⽤⼀个索引， ORDER BY涉及了两个索引</span><br><span class="line">explain select id from user order by name,age; //对应(name)、 (age)两个索引</span><br><span class="line"></span><br><span class="line">WHERE⼦句与ORDER BY⼦句，使⽤了不同的索引</span><br><span class="line">explain select id from user where name=&#x27;tom&#x27; order by age; //对应 (name)、 (age)索引</span><br><span class="line"></span><br><span class="line">WHERE⼦句或者ORDER BY⼦句中索引列使⽤了表达式，包括函数表达式</span><br><span class="line">explain select id from user order by abs(age); //对应(age)索引</span><br></pre></td></tr></table></figure>
+
+<h3 id="8、主键选择"><a href="#8、主键选择" class="headerlink" title="8、主键选择"></a>8、主键选择</h3><blockquote>
+<p>推荐小的自增数字，因为有序，占用内存小</p>
+</blockquote>
+<h2 id="九、查询优化"><a href="#九、查询优化" class="headerlink" title="九、查询优化"></a>九、查询优化</h2><h3 id="1、慢查询定位"><a href="#1、慢查询定位" class="headerlink" title="1、慢查询定位"></a>1、慢查询定位</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">mysql&gt; show variables like &#x27;slow_query_log%&#x27;;</span><br><span class="line">+---------------------+------------------------------------------+</span><br><span class="line">| Variable_name       | Value                                    |</span><br><span class="line">+---------------------+------------------------------------------+</span><br><span class="line">| slow_query_log      | OFF                                      |</span><br><span class="line">| slow_query_log_file | D:\Environment\mysql-5.7.19-winx64\data\ |</span><br><span class="line">+---------------------+------------------------------------------+</span><br><span class="line">2 rows in set, 8 warnings (0.06 sec)</span><br><span class="line"></span><br><span class="line">#开启慢查询</span><br><span class="line">mysql&gt; set global slow_query_log = ON;</span><br><span class="line">Query OK, 0 rows affected (0.02 sec)</span><br><span class="line"></span><br><span class="line">#设置慢查询文件</span><br><span class="line">mysql&gt; set global slow_query_log_file = &#x27;OAK-slow.log&#x27;;</span><br><span class="line">Query OK, 0 rows affected (0.01 sec)</span><br><span class="line"></span><br><span class="line">#表示会记录没有使用索引的查询SQL。</span><br><span class="line">mysql&gt; set global log_queries_not_using_indexes = ON;</span><br><span class="line">Query OK, 0 rows affected (0.00 sec)</span><br><span class="line"></span><br><span class="line">#指定慢查询的阈值，单位秒。如果SQL执行时间超过阈值，属于慢查询记录到日志文件中</span><br><span class="line">mysql&gt; set long_query_time = 10;</span><br><span class="line">Query OK, 0 rows affected (0.01 sec)</span><br></pre></td></tr></table></figure>
+
+<p>日志文件</p>
+<ul>
+<li>time ：⽇志记录的时间</li>
+<li>User@Host ：执⾏的⽤户及主机</li>
+<li>Query_time ：执⾏的时间</li>
+<li>Lock_time ：锁表时间</li>
+<li>Rows_sent ：发送给请求⽅的记录数，结果数量</li>
+<li>Rows_examined ：语句扫描的记录条数</li>
+<li>SET timestamp ：语句执⾏的时间点</li>
+<li>select…. ：执⾏的具体的SQL语句</li>
+</ul>
+<h3 id="2、慢查询优化"><a href="#2、慢查询优化" class="headerlink" title="2、慢查询优化"></a>2、慢查询优化</h3><p>慢查询原因总结</p>
+<ul>
+<li>全表扫描：explain分析type属性all</li>
+<li>全索引扫描</li>
+<li>索引过滤性不好：靠索引字段选型、数据量和状态、表设计</li>
+<li>频繁的回表查询开销：尽量少⽤select * ，使⽤覆盖索引</li>
+</ul>
+<h3 id="3、分页查询优化"><a href="#3、分页查询优化" class="headerlink" title="3、分页查询优化"></a>3、分页查询优化</h3><p>分页优化方案</p>
+<p>第一步：利用覆盖索引优化</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">原：</span><br><span class="line">select * from user limit 10000,100;</span><br><span class="line">优化：</span><br><span class="line">select id from user limit 10000,100;</span><br></pre></td></tr></table></figure>
+
+
+
+<p>第二步：利用子查询优化</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">原：</span><br><span class="line">select * from user limit 10000,100;</span><br><span class="line">优化后：</span><br><span class="line">select * from user where id&gt;= (select id from user limit 10000,1) limit 100;</span><br><span class="line">使用了id做主键比较(id&gt;=),并且子查询使用了覆盖索引进行优化。</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="十、最佳实践"><a href="#十、最佳实践" class="headerlink" title="十、最佳实践"></a>十、最佳实践</h2><h3 id="1、阿里开发规范"><a href="#1、阿里开发规范" class="headerlink" title="1、阿里开发规范"></a>1、阿里开发规范</h3><ol>
+<li><strong>【强制】业务上具有唯⼀特性的字段，即使是多个字段的组合，也必须建成唯⼀索引。</strong><br>说明：不要以为唯⼀索引影响了insert速度，这个速度损耗可以忽略，但提⾼查找速度是明显的；<br>另外，即使在应⽤层做了⾮常完善的校验控制，只要没有唯⼀索引，根据墨菲定律，必然有脏数据产⽣。</li>
+<li><strong>【强制】超过三个表禁⽌join。需要join的字段，数据类型必须绝对⼀致；多表关联查询时，保证被关联的字段需要有索引。</strong><br>说明：即使双表join也要注意表索引、 SQL性能。</li>
+<li>【强制】在varchar字段上建⽴索引时，必须指定索引⻓度，没必要对全字段建⽴索引，根据实际⽂<br>本区分度决定索引⻓度即可。<br>说明：索引的⻓度与区分度是⼀对⽭盾体，⼀般对字符串类型数据，⻓度为20的索引，区分度会⾼<br>达90%以上，可以使⽤count(distinct left(列名, 索引⻓度))&#x2F;count(<em>)的区分度来确定。</em></li>
+<li><strong>【强制】⻚⾯搜索严禁左模糊或者全模糊，如果需要请⾛搜索引擎来解决。</strong><br>说明：索引⽂件具有B-Tree的最左前缀匹配特性，如果左边的值未确定，那么⽆法使⽤此索引。</li>
+<li><strong>【推荐】如果有order by的场景，请注意利⽤索引的有序性。 order by 最后的字段是组合索引的⼀部分，并且放在索引组合顺序的最后，避免出现file_sort的情况，影响查询性能。</strong><br>正例： where a&#x3D;? and b&#x3D;? order by c; 索引： a_b_c<br>反例：索引中有范围查找，那么索引有序性⽆法利⽤，如： WHERE a&gt;10 ORDER BY b; 索引a_b⽆法排序。</li>
+<li><strong>【推荐】利⽤覆盖索引来进⾏查询操作，避免回表。</strong><br>说明：如果⼀本书需要知道第11章是什么标题，会翻开第11章对应的那⼀⻚吗？⽬录浏览⼀下就好，这个⽬录就是起到覆盖索引的作⽤。<br>正例：能够建⽴索引的种类分为主键索引、唯⼀索引、普通索引三种，⽽覆盖索引只是⼀种查询的<br>SELECT a.* FROM 表1 a, (select id from 表1 where 条件 LIMIT 100000,20 ) b<br>where a.id&#x3D;b.id<br>⼀种效果，⽤explain的结果， extra列会出现： using index。</li>
+<li><strong>【推荐】利⽤延迟关联或者⼦查询优化超多分⻚场景。</strong><br>说明： MySQL并不是跳过offset⾏，⽽是取offset+N⾏，然后返回放弃前offset⾏，返回N⾏，那当<br>offset特别⼤的时候，效率就⾮常的低下，要么控制返回的总⻚数，要么对超过特定阈值的⻚数进<br>⾏SQL改写。<br>正例：先快速定位需要获取的id段，然后再关联：</li>
+<li><strong>【推荐】 SQL性能优化的⽬标：⾄少要达到 range 级别，要求是ref级别，如果可以是consts最好。</strong><br>说明：<br>1） consts 单表中最多只有⼀个匹配⾏（主键或者唯⼀索引），在优化阶段即可读取到数据。<br>2） ref 指的是使⽤普通的索引（normal index）。<br>3） range 对索引进⾏范围检索。<br>反例： explain表的结果， type&#x3D;index，索引物理⽂件全扫描，速度⾮常慢，这个index级别⽐较<br>range还低，与全表扫描是⼩巫⻅⼤巫。</li>
+<li><strong>【推荐】建组合索引的时候，区分度最⾼的在最左边。</strong><br>正例：如果where a&#x3D;? and b&#x3D;? ， a列的⼏乎接近于唯⼀值，那么只需要单建idx_a索引即可。<br>说明：存在⾮等号和等号混合判断条件时，在建索引时，请把等号条件的列前置。如： where a&gt;?<br>and b&#x3D;? 那么即使a的区分度更⾼，也必须把b放在索引的最前列。</li>
+<li><strong>【推荐】防⽌因字段类型不同造成的隐式转换，导致索引失效。</strong></li>
+<li>【参考】创建索引时避免有如下极端误解： 1）宁滥勿缺。认为⼀个查询就需要建⼀个索引。 2）<br>宁缺勿滥。认为索引会消耗空间、严重拖慢更新和新增速度。 3）抵制惟⼀索引。认为业务的惟⼀<br>性⼀律需要在应⽤层通过“先查后插”⽅式解决。</li>
+</ol>
  
       <!-- reward -->
       
