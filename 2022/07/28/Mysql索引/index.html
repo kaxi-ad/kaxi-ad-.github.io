@@ -84,7 +84,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-quill-pen-line"></i>
             <span class="post-meta-item-text"> 字数统计:</span>
-            <span class="post-count">6.9k</span>
+            <span class="post-count">7.3k</span>
         </span>
     </span>
 
@@ -93,7 +93,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-book-open-line"></i>
             <span class="post-meta-item-text"> 阅读时长≈</span>
-            <span class="post-count">25 分钟</span>
+            <span class="post-count">27 分钟</span>
         </span>
     </span>
 </div>
@@ -523,6 +523,20 @@
 <li><strong>【推荐】防⽌因字段类型不同造成的隐式转换，导致索引失效。</strong></li>
 <li>【参考】创建索引时避免有如下极端误解： 1）宁滥勿缺。认为⼀个查询就需要建⼀个索引。 2）<br>宁缺勿滥。认为索引会消耗空间、严重拖慢更新和新增速度。 3）抵制惟⼀索引。认为业务的惟⼀<br>性⼀律需要在应⽤层通过“先查后插”⽅式解决。</li>
 </ol>
+<h3 id="2、普通索引和唯一索引的选择"><a href="#2、普通索引和唯一索引的选择" class="headerlink" title="2、普通索引和唯一索引的选择"></a>2、普通索引和唯一索引的选择</h3><p>读性能：</p>
+<p>普通索引：查找到满足条件的第一个记录，需要查找下一个记录，直到碰到第一个不满足条件的记录。</p>
+<p>唯一索引：索引定义了唯一性，查找到第一个满足条件的记录后，就会停止继续检索。</p>
+<p>InnoDB的数据是按数据页为单位来读写的。也就是说。当需要读一条记录的时候，并不是将记录本身从磁盘读出来，而是以页为单位，将其整体读入内存。在InnoDB中，每个数据页的大小默认是16KB。<strong>所以唯一索引读的性能优势微乎其微。</strong></p>
+<p>写性能：</p>
+<blockquote>
+<p>对于唯一索引来说，所有更新操作都要先判断这个操作是否违反唯一性约束</p>
+</blockquote>
+<p>插入记录前，先判断是否存在相同主键的记录，必须将数据页读入内存才能判断。</p>
+<p>如果已经读入到内存了，直接更新内存会更快，没必要使用change buffer。</p>
+<p><strong>因此，唯一索引的更新不能使用change buffer，实际上也只有普通索引可以使用。</strong></p>
+<p><strong>change buffer</strong>就是在非唯一普通索引页不在buffer pool中时，对页进行了写操作的情况下，先将记录变更缓冲，等未来数据被读取时，再将 change buffer 中的操作merge到原数据页的技术。在MySQL5.5之前，叫插入缓冲(insert buffer)，只针对insert做了优化；现在对delete和update也有效，叫做写缓冲(change buffer)。</p>
+<p>结论：</p>
+<p><strong>在实际使用中，普通索引和change buffer 的配合使用，对于数据量大的表的更新优化还是很明显的。</strong></p>
  
       <!-- reward -->
       

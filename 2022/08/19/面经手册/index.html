@@ -11,7 +11,7 @@
         name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1"
       />
-      <title>阿里云oss改造 |  卡西莫多的小站</title>
+      <title>面经手册总结 |  卡西莫多的小站</title>
   <meta name="generator" content="hexo-theme-ayer">
       
       <link rel="shortcut icon" href="/favicon.ico" />
@@ -53,7 +53,7 @@
     <main class="content on">
       <section class="outer">
   <article
-  id="post-oss"
+  id="post-面经手册"
   class="article article-type-post"
   itemscope
   itemprop="blogPost"
@@ -64,7 +64,7 @@
     <header class="article-header">
        
 <h1 class="article-title sea-center" style="border-left:0" itemprop="name">
-  阿里云oss改造
+  面经手册总结
 </h1>
  
 
@@ -72,11 +72,11 @@
     </header>
      
     <div class="article-meta">
-      <a href="/2022/08/15/oss/" class="article-date">
-  <time datetime="2022-08-15T06:45:25.000Z" itemprop="datePublished">2022-08-15</time>
+      <a href="/2022/08/19/%E9%9D%A2%E7%BB%8F%E6%89%8B%E5%86%8C/" class="article-date">
+  <time datetime="2022-08-19T07:15:25.000Z" itemprop="datePublished">2022-08-19</time>
 </a> 
   <div class="article-category">
-    <a class="article-category-link" href="/categories/oss/">oss</a>
+    <a class="article-category-link" href="/categories/%E9%9D%A2%E7%BB%8F/">面经</a>
   </div>
   
 <div class="word_count">
@@ -84,7 +84,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-quill-pen-line"></i>
             <span class="post-meta-item-text"> 字数统计:</span>
-            <span class="post-count">616</span>
+            <span class="post-count">567</span>
         </span>
     </span>
 
@@ -93,7 +93,7 @@
         <span class="post-meta-item-icon">
             <i class="ri-book-open-line"></i>
             <span class="post-meta-item-text"> 阅读时长≈</span>
-            <span class="post-count">3 分钟</span>
+            <span class="post-count">2 分钟</span>
         </span>
     </span>
 </div>
@@ -108,53 +108,85 @@
   
     <div class="article-entry" itemprop="articleBody">
        
-  <h1 id="1、阿里云OSS"><a href="#1、阿里云OSS" class="headerlink" title="1、阿里云OSS"></a>1、阿里云OSS</h1><ul>
-<li><p>我们要做文件服务，阿里云oss是一个很好的分布式文件服务系统，所以我们只需要集成阿里云oss即可</p>
-</li>
-<li><p><a target="_blank" rel="noopener" href="https://www.aliyun.com/">https://www.aliyun.com/</a></p>
-<p>![image-20210317153154543](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;02 图片&#x2F;image-20210317153154543.png)</p>
-</li>
-</ul>
-<h2 id="2-1-开通“对象存储OSS”服务"><a href="#2-1-开通“对象存储OSS”服务" class="headerlink" title="2.1 开通“对象存储OSS”服务"></a>2.1 开通“对象存储OSS”服务</h2><ol>
-<li><p>申请阿里云账号并实名认证</p>
-</li>
-<li><p>开通“对象存储OSS”服务</p>
-<p>![image-20210317153335688](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;02 图片&#x2F;image-20210317153335688.png)</p>
-<p>![image-20210317155050654](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;02 图片&#x2F;image-20210317155050654.png)</p>
-</li>
-<li><p>进入管理控制台</p>
-</li>
-</ol>
-<p>![image-20210317155110318](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;02 图片&#x2F;image-20210317155110318.png)</p>
-<h2 id="2-2-创建Bucket"><a href="#2-2-创建Bucket" class="headerlink" title="2.2 创建Bucket"></a>2.2 创建Bucket</h2><ul>
-<li>类似”包”的概念，易于管理和存储</li>
-<li>选择：标准存储、公共读、不开通</li>
-</ul>
-<p>![image-20210317155701371](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;\02 图片\image-20210317155701371.png)</p>
-<ul>
-<li>oss授权</li>
-</ul>
-<p>![image-20210317161600202](D:&#x2F;拉钩&#x2F;课件&#x2F;10.阶段十&#x2F;\02 图片\image-20210317161600202.png)</p>
-<ul>
-<li>pom</li>
-</ul>
-<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- 阿里云oss依赖 --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.aliyun.oss<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>aliyun-sdk-oss<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">&lt;!-- 日期工具栏依赖 --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>joda-time<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>joda-time<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+  <h1 id="HashMap源码分析（上）"><a href="#HashMap源码分析（上）" class="headerlink" title="HashMap源码分析（上）"></a>HashMap源码分析（上）</h1><h2 id="一、散列表实现"><a href="#一、散列表实现" class="headerlink" title="一、散列表实现"></a>一、散列表实现</h2><p>计算出存储对象的hashcode，</p>
+<p>计算得出的索引位置就是存储在链表中的位置</p>
+<h2 id="二、扰动函数"><a href="#二、扰动函数" class="headerlink" title="二、扰动函数"></a>二、扰动函数</h2><p>公式</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="title function_">hash</span><span class="params">(Object key)</span> &#123;</span><br><span class="line">        <span class="type">int</span> h;</span><br><span class="line">        <span class="keyword">return</span> (key == <span class="literal">null</span>) ? <span class="number">0</span> : (h = key.hashCode()) ^ (h &gt;&gt;&gt; <span class="number">16</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
 
-<ul>
-<li>yml</li>
-</ul>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">aliyun:</span></span><br><span class="line">  <span class="attr">oss:</span></span><br><span class="line">    <span class="attr">endpoint:</span> <span class="string">oss-cn-beijing.aliyuncs.com</span></span><br><span class="line">	<span class="attr">accessKeyId:</span> <span class="string">LTAI4G4SV6WtST7UYH776xxx</span></span><br><span class="line"> 	<span class="attr">secret:</span> <span class="string">X9KHNYgztNr9MI5Zp8JffQPZO4uxxx</span></span><br><span class="line">	<span class="attr">bucket:</span> <span class="string">lagou-laosun</span></span><br></pre></td></tr></table></figure>
+<p>hashcode取值范围[-2147483648, 2147483647]  </p>
+<p>因为hashcode取值范围太大，不可能新建数组大小也这么大，所以需要扰动函数</p>
+<table>
+<thead>
+<tr>
+<th>名</th>
+<th>运算值</th>
+<th>运算过程</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>梁哥的hashcode</td>
+<td>1100  1111110010000100</td>
+<td>哈希值</td>
+</tr>
+<tr>
+<td>hashcode &gt;&gt;&gt; 16</td>
+<td>0000000000001100</td>
+<td>右移16位</td>
+</tr>
+<tr>
+<td>“梁哥”.hashCode^(hashcode &gt;&gt;&gt; 16)</td>
+<td>0000000000001000</td>
+<td>异或高低位</td>
+</tr>
+<tr>
+<td>(“梁哥”.hashCode^(hashcode &gt;&gt;&gt; 16))&amp;7(数组长度-1)</td>
+<td>0000</td>
+<td>与运算下表</td>
+</tr>
+</tbody></table>
+<p>目的：增加随机性，减少碰撞</p>
+<h2 id="三、初始化容量"><a href="#三、初始化容量" class="headerlink" title="三、初始化容量"></a>三、初始化容量</h2><p>计算阈值大小的方法</p>
+<p>寻找大于容量的2的倍数最小值</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="title function_">tableSizeFor</span><span class="params">(<span class="type">int</span> cap)</span> &#123;</span><br><span class="line">        <span class="type">int</span> <span class="variable">n</span> <span class="operator">=</span> cap - <span class="number">1</span>;</span><br><span class="line">        n |= n &gt;&gt;&gt; <span class="number">1</span>;</span><br><span class="line">        n |= n &gt;&gt;&gt; <span class="number">2</span>;</span><br><span class="line">        n |= n &gt;&gt;&gt; <span class="number">4</span>;</span><br><span class="line">        n |= n &gt;&gt;&gt; <span class="number">8</span>;</span><br><span class="line">        n |= n &gt;&gt;&gt; <span class="number">16</span>;</span><br><span class="line">        <span class="keyword">return</span> (n &lt; <span class="number">0</span>) ? <span class="number">1</span> : (n &gt;= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
 
-<ul>
-<li>controller</li>
-</ul>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RestController</span></span><br><span class="line"><span class="meta">@RequestMapping(&quot;file&quot;)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">FileController</span> &#123;</span><br><span class="line">    <span class="meta">@Autowired</span></span><br><span class="line">    <span class="keyword">private</span> FileService fileService;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//上传文件到阿里云oss</span></span><br><span class="line">    <span class="meta">@PostMapping(&quot;fileUpload&quot;)</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">fileUpload</span><span class="params">(<span class="meta">@RequestParam(&quot;file&quot;)</span> MultipartFile file)</span> &#123;</span><br><span class="line">        <span class="comment">//获取上传文件</span></span><br><span class="line">        <span class="type">String</span> <span class="variable">url</span> <span class="operator">=</span> fileService.upload(file);</span><br><span class="line">        <span class="keyword">return</span> url;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>例如初始容量17</p>
+<table>
+<thead>
+<tr>
+<th>17-1</th>
+<th>0 0 0 1 0 0 0 0</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>n |&#x3D; n &gt;&gt;&gt; 1;</td>
+<td>0 0 0 1 1 0 0 0</td>
+</tr>
+<tr>
+<td>n |&#x3D; n &gt;&gt;&gt; 2;</td>
+<td>0 0 0 1 1 1 0 0</td>
+</tr>
+<tr>
+<td>n | &#x3D; n &gt;&gt;&gt; 4;</td>
+<td>0 0 0 1 1 1 1 0</td>
+</tr>
+<tr>
+<td>n | &#x3D; n &gt;&gt;&gt; 8;</td>
+<td>0 0 0 1 1 1 1 1</td>
+</tr>
+<tr>
+<td>n | &#x3D; n &gt;&gt;&gt; 16;</td>
+<td>0 0 0 1 1 1 1 1(32)</td>
+</tr>
+</tbody></table>
+<h2 id="四、负载因子"><a href="#四、负载因子" class="headerlink" title="四、负载因子"></a>四、负载因子</h2><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">float</span> <span class="variable">DEFAULT_LOAD_FACTOR</span> <span class="operator">=</span> <span class="number">0.75f</span>;</span><br></pre></td></tr></table></figure>
 
-<ul>
-<li>service</li>
-</ul>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@Service</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">FileServiceImpl</span> <span class="keyword">implements</span> <span class="title class_">FileService</span> &#123;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;aliyun.oss.endpoint&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String endpoint;</span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;aliyun.oss.accessKeyId&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String accessKeyId;</span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;aliyun.oss.secret&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String secret;</span><br><span class="line">    <span class="meta">@Value(&quot;$&#123;aliyun.oss.bucket&#125;&quot;)</span></span><br><span class="line">    <span class="keyword">private</span> String bucket;</span><br><span class="line">    </span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> String <span class="title function_">upload</span><span class="params">(MultipartFile file)</span> &#123;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="comment">// 创建OSSClient实例。</span></span><br><span class="line">            <span class="type">OSS</span> <span class="variable">ossClient</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">OSSClientBuilder</span>().build(endpoint, accessKeyId, accessKeySecret);</span><br><span class="line">            <span class="comment">// 上传文件流。</span></span><br><span class="line">            <span class="type">InputStream</span> <span class="variable">inputStream</span> <span class="operator">=</span> file.getInputStream();</span><br><span class="line">            <span class="type">String</span> <span class="variable">fileName</span> <span class="operator">=</span> file.getOriginalFilename();</span><br><span class="line">            <span class="comment">// 生成随机唯一值，使用uuid，添加到文件名称里面</span></span><br><span class="line">            <span class="type">String</span> <span class="variable">uuid</span> <span class="operator">=</span> UUID.randomUUID().toString().replaceAll(<span class="string">&quot;-&quot;</span>,<span class="string">&quot;&quot;</span>);</span><br><span class="line">            fileName = uuid+fileName;</span><br><span class="line">            <span class="comment">//按照当前日期，创建文件夹，上传到创建文件夹里面</span></span><br><span class="line">            <span class="comment">// 2021/02/02/01.mp4</span></span><br><span class="line">            <span class="type">String</span> <span class="variable">timeUrl</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">DateTime</span>().toString(<span class="string">&quot;yyyy/MM/dd&quot;</span>);</span><br><span class="line">            fileName = timeUrl+<span class="string">&quot;/&quot;</span>+fileName; <span class="comment">// 2021/02/02/23fads85rj4hka01.mp4</span></span><br><span class="line">            <span class="comment">// 调用方法实现上传</span></span><br><span class="line">            ossClient.putObject(bucketName, fileName, inputStream);</span><br><span class="line">            <span class="comment">// 关闭OSSClient。</span></span><br><span class="line">            ossClient.shutdown();</span><br><span class="line">            <span class="comment">// 上传之后文件路径</span></span><br><span class="line">            <span class="comment">// https://lagou-laosun.oss-cn-beijing.aliyuncs.com/01.jpg</span></span><br><span class="line">            <span class="type">String</span> <span class="variable">url</span> <span class="operator">=</span> <span class="string">&quot;https://&quot;</span>+bucketName+<span class="string">&quot;.&quot;</span>+endpoint+<span class="string">&quot;/&quot;</span>+fileName;</span><br><span class="line">            <span class="comment">// 返回</span></span><br><span class="line">            <span class="keyword">return</span> url;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
+<p>当数组实际数据超过数组容量*负载因子，进行扩容，减少hash碰撞</p>
+<h2 id="五、扩容元素拆分"><a href="#五、扩容元素拆分" class="headerlink" title="五、扩容元素拆分"></a>五、扩容元素拆分</h2><p>原哈希值与扩容新增出来的长度 16，进行&amp;运算，如果值等于 0，则下标位置不变。如果不为<br>0，那么新的位置则是原来位置上加 16。  </p>
+<h1 id="HashMap-源码分析-下"><a href="#HashMap-源码分析-下" class="headerlink" title="HashMap 源码分析(下)"></a>HashMap 源码分析(下)</h1><h2 id="一、插入"><a href="#一、插入" class="headerlink" title="一、插入"></a>一、插入</h2><p>1、如果出现哈希值计算的下标碰撞了怎么办？</p>
+<p>2、如果碰撞了是扩容数组还是把值存成链表结构，让一个节点有多个值存放呢？</p>
+<p>3、如果存放的数据的链表过长，就失去了散列表的性能了，怎么办呢？</p>
+<p>4、如果想解决链表过长，什么时候使用树结构呢，使用哪种树呢？  </p>
+<p><img src="/images/%E9%9D%A2%E7%BB%8F%E6%89%8B%E5%86%8C/hashMap%E6%B5%81%E7%A8%8B.png" alt="插入流程"></p>
  
       <!-- reward -->
       
@@ -225,12 +257,12 @@
     <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
     <p>扫一扫，分享到微信</p>
     <div class="wx-qrcode">
-      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://example.com/2022/08/15/oss/" alt="微信分享二维码">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://example.com/2022/08/19/%E9%9D%A2%E7%BB%8F%E6%89%8B%E5%86%8C/" alt="微信分享二维码">
     </div>
 </div>
 
 <div id="share-mask"></div>  
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/springCloud%E7%BB%84%E4%BB%B6/" rel="tag">springCloud组件</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%B9%E8%B1%A1%E5%AD%98%E5%82%A8/" rel="tag">对象存储</a></li></ul>
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/java%E5%9F%BA%E7%A1%80/" rel="tag">java基础</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B0%8F%E5%82%85%E5%93%A5/" rel="tag">小傅哥</a></li></ul>
 
     </footer>
   </div>
@@ -238,19 +270,10 @@
    
   <nav class="article-nav">
     
-      <a href="/2022/08/19/%E9%9D%A2%E7%BB%8F%E6%89%8B%E5%86%8C/" class="article-nav-link">
-        <strong class="article-nav-caption">上一篇</strong>
-        <div class="article-nav-title">
-          
-            面经手册总结
-          
-        </div>
-      </a>
     
-    
-      <a href="/2022/08/12/Mysql%E6%9E%B6%E6%9E%84%E8%AE%BE%E8%AE%A1/" class="article-nav-link">
+      <a href="/2022/08/15/oss/" class="article-nav-link">
         <strong class="article-nav-caption">下一篇</strong>
-        <div class="article-nav-title">Mysql架构设计</div>
+        <div class="article-nav-title">阿里云oss改造</div>
       </a>
     
   </nav>
