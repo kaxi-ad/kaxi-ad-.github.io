@@ -323,7 +323,7 @@
 <h5 id="Write-Behind-Caching-Pattern"><a href="#Write-Behind-Caching-Pattern" class="headerlink" title="Write Behind Caching Pattern"></a>Write Behind Caching Pattern</h5><p>应用程序只更新缓存。</p>
 <p>缓存通过异步的方式将数据批量或合并后更新到DB中</p>
 <p>不能实时同步，甚至会丢数据</p>
-<h2 id="二、Redis"><a href="#二、Redis" class="headerlink" title="二、Redis"></a>二、Redis</h2><blockquote>
+<h2 id="二、Redis基本功能"><a href="#二、Redis基本功能" class="headerlink" title="二、Redis基本功能"></a>二、Redis基本功能</h2><blockquote>
 <p>Redis（Remote Dictinonary Server）远程字典服务器，是用C语言开发的一个开源的高性能键值对（key-value）内存数据库。</p>
 </blockquote>
 <p>Redis应用场景</p>
@@ -1046,6 +1046,150 @@
 <li>content：数据内容</li>
 </ul>
 <p>ziplist结构体如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ziplist</span>&lt;</span>T&gt;&#123;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> zlbytes; <span class="comment">//ziplist的长度字节数，包含头部、所有entry和zipend。</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> zloffset;<span class="comment">//从ziplist的头指针到只想最后一个entry的偏移量，用于快速反向查询</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">short</span> <span class="type">int</span> zllength; <span class="comment">//entry元素个数</span></span><br><span class="line">    T[] entry; <span class="comment">//元素值</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> zlend;<span class="comment">//ziplist结束符，值固定为0xFF</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zlentry</span>&#123;</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> prevrawlensize; <span class="comment">//previous_entry_length字段的⻓度</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> prevrawlen; <span class="comment">//previous_entry_length字段存储的内容</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> lensize; <span class="comment">//encoding字段的⻓度</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> len; <span class="comment">//数据内容⻓度</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> headersize; <span class="comment">//当前元素的⾸部⻓度，即previous_entry_length字段⻓度与 encoding字段⻓度之和。</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">char</span> encoding; <span class="comment">//数据类型</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">char</span> *p; <span class="comment">//当前元素⾸地址</span></span><br><span class="line">&#125;zlentry</span><br></pre></td></tr></table></figure>
+
+<p>应用场景：</p>
+<p><strong>sorted-set和hash元素个数少且是小整数或短字符串（直接使用）</strong></p>
+<p>list用快速链表(quicklist)数据结构存储，而快速链表是双向列表与压缩列表的组合。(间接使用)</p>
+<p>注意：</p>
+<p>不管是使⽤Hash还是Sorted Set，当采⽤ziplist⽅式存储时，虽然可以节省内存空间，但是<strong>在查询指定元素时，都要遍历整个ziplist</strong>，找到指定的元素。所以使⽤ziplist方式存储时，虽然可以利⽤CPU高速缓存，但也不适合存储过多的数据（hash-max-ziplist-entries和zset-max-ziplist-entries不宜设置过大），否则查询性能就会下降比较厉害。整体来说，这样的方案就是<strong>使用稀疏索引的思想 时间换空间</strong> ，我们需要权衡使用。  </p>
+<p>使用ziplist存储，尽量存储int数据</p>
+<ul>
+<li>针对要存储的数据，会尽量选择占用内存小的方式存储（整数比字符串存储时占用内存更小）</li>
+<li>ziplist每个元素紧凑排列，并且每个元素存储了上一个元素的长度，所以当修改其中一个元素超过一定大小时，会引发多个元素的<strong>级联调整</strong>。引发性能问题，需要注意。（后续redis版本提供了个listpack的数据结构解决这个问题）</li>
+</ul>
+<h5 id="5-整数集合"><a href="#5-整数集合" class="headerlink" title="(5)整数集合"></a>(5)整数集合</h5><p>整数集合(intset)是一个有序的(整数升序)、存储整数的连续存储结构。</p>
+<p>当Redis集合类型的元素都是整数并且都处在64位有符号整数范围内(2^64),使用该结构体存储。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;sadd set:001 1 3 5 6 2</span><br><span class="line">&quot;5&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding set:001</span><br><span class="line">&quot;intset&quot;</span><br><span class="line">192.168.200.132:0&gt;sadd set:004 1 100000000000000000000000000 999999999</span><br><span class="line">&quot;3&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding set:004</span><br><span class="line">&quot;hashtable&quot;</span><br></pre></td></tr></table></figure>
+
+<p>intset结构图：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">intset</span>&#123;</span></span><br><span class="line">    <span class="comment">//编码方式</span></span><br><span class="line">    <span class="type">uint32_t</span> encoding;</span><br><span class="line">    <span class="comment">//集合包含的元素数量</span></span><br><span class="line">    <span class="type">uint32_t</span> length;</span><br><span class="line">    <span class="comment">//保存元素的数组</span></span><br><span class="line">    <span class="type">int8_t</span> contents[];</span><br><span class="line">&#125;intset;</span><br></pre></td></tr></table></figure>
+
+<p>应用场景：</p>
+<p>可以保存类型为int16_t、int32_t或者int64_t的整数值，并且保证集合中不会出现重复元素。</p>
+<p>快速列表（重要）</p>
+<p>列表的底层实现。（在Redis3.2之前，Redis采用双向链表(adlist)和压缩列表(ziplist)实现。）在Redis3.2以后结合adlist和ziplist的优势Redis设计出了quicklist</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;lpush list:001 1 2 5 4 3</span><br><span class="line">&quot;5&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding list:001</span><br><span class="line">&quot;quicklist&quot;</span><br></pre></td></tr></table></figure>
+
+<h5 id="6-双向链表-adlist"><a href="#6-双向链表-adlist" class="headerlink" title="(6)双向链表(adlist)"></a>(6)双向链表(adlist)</h5><p><img src="/images/Redis/8.jpg" alt="双向列表"></p>
+<p>优势：</p>
+<ul>
+<li><p>双向：链表具有前置节点和后置节点的引用，获取这两个节点时间复杂度都为O(1)。</p>
+</li>
+<li><p>普通链表(单链表)：节点类保留下⼀节点的引用。链表类只保留头节点的引用，只能从头节点插入删除</p>
+</li>
+<li><p>无环：表头节点的 prev 指针和表尾节点的 next 指针都指向 NULL,对链表的访问都是以 NULL 结束。</p>
+<p>环状：头的前一个节点指向尾节点</p>
+</li>
+<li><p>带链表长度计数器：通过 len 属性获取链表⻓度的时间复杂度为 O(1)。</p>
+</li>
+<li><p>多态：链表节点使⽤ void* 指针来保存节点值，可以保存各种不同类型的值。</p>
+</li>
+</ul>
+<h5 id="7-快速列表"><a href="#7-快速列表" class="headerlink" title="(7)快速列表"></a>(7)快速列表</h5><p>quicklist是一个双向链表，链表中每个节点是一个ziplist结构。quicklist中的每个节点ziplist都能够存储多个数据元素。</p>
+<p>quicklist结构定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">quicklist</span>&#123;</span></span><br><span class="line">	quciklistNode *head;	<span class="comment">//指向quicklist的头部</span></span><br><span class="line">    quicklistNode *tail;	<span class="comment">//指向quicklist的尾部</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">long</span> count;	<span class="comment">//列表中所有数据项的个数总和</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> len;		<span class="comment">//quicklist节点的个数，即ziplist的个数</span></span><br><span class="line">    <span class="type">int</span> fill : <span class="number">16</span>;			<span class="comment">//ziplist大小限定，由list-max-ziplist-size给定</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> compress : <span class="number">16</span>; <span class="comment">//节点压缩深度设置，由list-compress-depth给定(Redis设定)</span></span><br><span class="line">&#125;quicklist;</span><br></pre></td></tr></table></figure>
+
+<p>quicklistNode的结构定义如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span>&#123;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span> *<span class="title">prev</span>;</span> <span class="comment">// 指向上⼀个ziplist节点</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span> *<span class="title">next</span>;</span> <span class="comment">// 指向下⼀个ziplist节点</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">char</span> *zl; <span class="comment">// 数据指针，如果没有被压缩，就指向ziplist结构，反之指向 quicklistLZF结构</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> sz; <span class="comment">// 表示指向ziplist结构的总⻓度(内存占⽤⻓度)</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> count : <span class="number">16</span>; <span class="comment">// 表示ziplist中的数据项个数</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> encoding : <span class="number">2</span>; <span class="comment">// 编码⽅式， 1--ziplist， 2--quicklistLZF</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> container : <span class="number">2</span>; <span class="comment">// 预留字段，存放数据的⽅式， 1--NONE， 2--ziplist</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> recompress : <span class="number">1</span>; <span class="comment">// 解压标记，当查看⼀个被压缩的数据时，需要暂时解压，标记此参数为 1，之后再重新进⾏压缩</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> attempted_compress : <span class="number">1</span>; <span class="comment">// 测试相关</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> extra : <span class="number">10</span>; <span class="comment">// 扩展字段，暂时没⽤</span></span><br><span class="line">&#125;quicklistNode</span><br></pre></td></tr></table></figure>
+
+<p><strong>数据压缩</strong></p>
+<p>quicklist每个节点的实际数据存储结构为ziplist ，这种结构的优势在于节省存储空间。为了进⼀步降低ziplist的存储空间，还可以对ziplist进⾏压缩。 Redis采⽤的压缩算法是LZF。其基本思想是：数据与前面重复的记录重复位置及⻓度，不重复的记录原始数据。<br>压缩过后的数据可以分成多个⽚段，每个⽚段有两个部分：解释字段和数据字段。 quicklistLZF的结构体如下：  </p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">quicklistLZF</span>&#123;</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">int</span> sz;<span class="comment">//LZF压缩后占用的字节数</span></span><br><span class="line">    <span class="type">char</span> compressed[];<span class="comment">//柔性数组，指向数据部分</span></span><br><span class="line">&#125;quicklistLZF;</span><br></pre></td></tr></table></figure>
+
+<p>应用场景</p>
+<p>列表(List)的底层实现、发布与订阅、慢查询、监视器等功能</p>
+<h4 id="10种encoding"><a href="#10种encoding" class="headerlink" title="10种encoding"></a>10种encoding</h4><p>encoding表示对象的内部编码，占4位。</p>
+<p>Redis通过encoding属性为对象设置不同的编码</p>
+<p>对于少的和小的数据，Redis采用小的和压缩的存储方式，体现Redis的灵活性，大大提高了Redis的存储量和执行效率</p>
+<h5 id="1-String"><a href="#1-String" class="headerlink" title="(1)String"></a>(1)String</h5><p>int、raw、embstr</p>
+<ul>
+<li>当保存的是Long类型整数时，RedisObject中的指针就直接赋值为整数数据了，这样就不用额外的指针再指向整数了，节省了指针的空间开销。</li>
+<li>当保存的是字符串数据，且字符串小于等于44字节时，RedisObject中的元数据、指针和SDS是一块连续的内存区域，这样就可以避免内存碎片，对cpu cacheline也比较友好。embstr编码</li>
+<li>当字符串大于44字节时，SDS的数据量就开始变多了，Redis不再把SDS和RedisObject布局在一起了，而是会给SDS分配独立的空间，并用指针指向SDS结构。这种布局方式称为raw编码模式</li>
+</ul>
+<h6 id="int"><a href="#int" class="headerlink" title="int"></a>int</h6><p>REDIS_ENCODING_INT(int类型的整数)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;set n1 123</span><br><span class="line">&quot;OK&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding n1</span><br><span class="line">&quot;int&quot;</span><br></pre></td></tr></table></figure>
+
+<h6 id="embstr"><a href="#embstr" class="headerlink" title="embstr"></a>embstr</h6><p>REDIS_ENCODING_EMBSTR(编码的简单动态字符串)</p>
+<p>小字符串 长度小于44字节</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;set n1 abc</span><br><span class="line">&quot;OK&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding n1</span><br><span class="line">&quot;embstr&quot;</span><br></pre></td></tr></table></figure>
+
+<h6 id="raw"><a href="#raw" class="headerlink" title="raw"></a>raw</h6><p>REDIS_ENCODING_RAW(简单动态字符串)</p>
+<p>大字符串 长度大于44个字节</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;set n1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</span><br><span class="line">&quot;OK&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding n1</span><br><span class="line">&quot;raw&quot;</span><br></pre></td></tr></table></figure>
+
+
+
+<h5 id="2-list"><a href="#2-list" class="headerlink" title="(2)list"></a>(2)list</h5><p>列表的编码是quicklist。</p>
+<p>REDIS_ENCODING_QUICKLIST(快速列表)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;lpush list:001 1 2 3 4 6 5</span><br><span class="line">&quot;11&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding list:001</span><br><span class="line">&quot;quicklist&quot;</span><br></pre></td></tr></table></figure>
+
+<h5 id="3-hash"><a href="#3-hash" class="headerlink" title="(3)hash"></a>(3)hash</h5><p>散列的编码是字典和压缩列表</p>
+<h6 id="dict"><a href="#dict" class="headerlink" title="dict"></a>dict</h6><p>REDIS_ENCODING_HT(字典)</p>
+<p>当散列表元素的个数⽐较多或元素不是⼩整数或短字符串时。  </p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;hmset user:003 username11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111 222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222</span><br><span class="line">&quot;OK&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding user:003</span><br><span class="line">&quot;hashtable&quot;</span><br></pre></td></tr></table></figure>
+
+<h6 id="ziplist"><a href="#ziplist" class="headerlink" title="ziplist"></a>ziplist</h6><p>REDIS_ENCODING_ZIPLIST (压缩列表)<br>当散列表元素的个数⽐较少，且元素都是⼩整数或短字符串时。  </p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; hmset user:001 username zhangfei password 111 age 23</span><br><span class="line">sex M</span><br><span class="line">OK</span><br><span class="line">127.0.0.1:6379&gt; object encoding user:001</span><br><span class="line">&quot;ziplist&quot;</span><br></pre></td></tr></table></figure>
+
+<h5 id="4-set"><a href="#4-set" class="headerlink" title="(4)set"></a>(4)set</h5><p>整形集合和字典</p>
+<h6 id="intset"><a href="#intset" class="headerlink" title="intset"></a>intset</h6><p>REDIS_ENCODING_INTSET(整数集合)</p>
+<p>当Redis集合类型的元素都是整数并且都处在64位有符号整数范围内(&lt;18446744073709551616)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;sadd set:001 1 3 5 6 2</span><br><span class="line">&quot;5&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding set:001</span><br><span class="line">&quot;intset&quot;</span><br></pre></td></tr></table></figure>
+
+<h6 id="dict-1"><a href="#dict-1" class="headerlink" title="dict"></a>dict</h6><p>REDIS_ENCODING_HT(字典)</p>
+<p>当Redis集合类型元素是非整数或都处在64位有符号整数范围外(&gt;18446744073709551616)</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;sadd set:004 11111111111111111111111111111111111111111 22222222222222222222222222222222222222222222222222222222222222222222222222222222222</span><br><span class="line">&quot;2&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding set:004</span><br><span class="line">&quot;hashtable&quot;</span><br></pre></td></tr></table></figure>
+
+
+
+<h5 id="5-zset"><a href="#5-zset" class="headerlink" title="(5)zset"></a>(5)zset</h5><p>压缩列表和跳跃表+字典</p>
+<h6 id="ziplist-1"><a href="#ziplist-1" class="headerlink" title="ziplist"></a>ziplist</h6><p>REDIS_ENCODING_ZIPLIST(压缩列表)</p>
+<p>元素个数比较少，且元素都是小整数或短字符串时。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;zadd hit:1 100 item1 20 item2 45 item3</span><br><span class="line">&quot;3&quot;</span><br><span class="line">192.168.200.132:0&gt;object encoding hit:1</span><br><span class="line">&quot;listpack&quot;</span><br></pre></td></tr></table></figure>
+
+<h6 id="skiplist-dict"><a href="#skiplist-dict" class="headerlink" title="skiplist+dict"></a>skiplist+dict</h6><p>REDIS_ENCODING_SKIPLIST(跳跃表+字典)</p>
+<p>当元素的个数比较多或元素不是小整数或短字符串时</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">192.168</span><span class="number">.200</span><span class="number">.132</span>:<span class="number">0</span>&gt;zadd hit:<span class="number">002</span> <span class="number">100</span> item1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111 <span class="number">20</span> item2 <span class="number">45</span> item3</span><br><span class="line"><span class="string">&quot;3&quot;</span></span><br><span class="line"><span class="number">192.168</span><span class="number">.200</span><span class="number">.132</span>:<span class="number">0</span>&gt;object encoding hit:<span class="number">002</span></span><br><span class="line"><span class="string">&quot;skiplist&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="三、Redis原理"><a href="#三、Redis原理" class="headerlink" title="三、Redis原理"></a>三、Redis原理</h2><h3 id="1、Redis持久化"><a href="#1、Redis持久化" class="headerlink" title="1、Redis持久化"></a>1、Redis持久化</h3><h4 id="为什么要持久化"><a href="#为什么要持久化" class="headerlink" title="为什么要持久化"></a>为什么要持久化</h4><p>目的：为了快速的恢复数据而不是为了存储数据</p>
+<p>持久化方式：RDB和AOF</p>
+<p>注：Redis持久化不保证数据的完整性</p>
+<p>当Redis用作DB时，DB数据要完整，所以一定要有一个完整的数据源（文件、mysql）在系统启动时，从这个完整的数据源中将数据load到Redis中</p>
+<h4 id="RDB"><a href="#RDB" class="headerlink" title="RDB"></a>RDB</h4><p>RDB（Redis DataBase），是redis默认的存储方式，RDB方式是通过快照(snapshotting)完成的。</p>
+<p>触发快照的方式</p>
+<p>①符合自定义配置的快照规则（在redis.conf中配置）</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">save &quot;&quot; #不使用RDB存储	不能主从</span><br><span class="line"></span><br><span class="line">save 900 1 #表示15分钟(900秒)内至少一个键被更改则进行快照</span><br></pre></td></tr></table></figure>
+
+<p>②执行save或者bgsave命令，save会阻塞在主进程，bgsave不会</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;bgsave</span><br><span class="line">&quot;Background saving started&quot;</span><br></pre></td></tr></table></figure>
+
+<p>③执行flushall命令</p>
+<p>④执行主从复制操作(第一次)</p>
+<h5 id="RDB执行流程-原理"><a href="#RDB执行流程-原理" class="headerlink" title="RDB执行流程(原理)"></a>RDB执行流程(原理)</h5><p>①Redis父进程⾸先判断：当前是否在执行save ，或bgsave&#x2F;bgrewriteaof ( aof文件重写命令)的子进<br>程，如果在执行则bgsave命令直接返回。<br>②父进程执行fork (调⽤OS函数复制主进程)操作创建子进程，这个 复制过程中父进程是阻塞的 ，<br>Redis不能执行来自客户端的任何命令。<br>③父进程fork后， bgsave命令返回”Background saving started”信息并不再阻塞父进程，并可以响<br>应其他命令。<br>④子进程创建RDB⽂件，根据父进程内存快照生成临时快照文件，完成后对原有文件进行原子替换。<br>( RDB始终完整)<br>⑤子进程发送信号给父进程表示完成，父进程更新统计信息。<br>⑥父进程fork子进程后，继续工作。 </p>
+<h5 id="RDB优缺点"><a href="#RDB优缺点" class="headerlink" title="RDB优缺点"></a>RDB优缺点</h5><ul>
+<li>优点</li>
+</ul>
+<p>RDB是二进制压缩文件，占用空间小，便于传输(传给slaver)</p>
+<p>主进程fork子进程，可以最大化Redis性能，主进程不能太大，Redis的数据量不能太大，fork复制过程中主进程阻塞</p>
+<ul>
+<li>缺点</li>
+</ul>
+<p>不保证数据完整性，会丢失最后一次快照以后更改的所有数据</p>
+<h5 id="场景提问"><a href="#场景提问" class="headerlink" title="场景提问"></a>场景提问</h5><p><strong>快照时可以修改嘛？</strong></p>
+<p>Redis会借助操作系统的写时复制技术(Copy-On-Write,COW)，在执行快照的同时，正常处理写操作。</p>
+<p>如果主线程也是读数据，那么和bgsave子线程不影响。</p>
+<p>如果主线程要修改一块数据，这块数据会被复制一份，生成副本。主线程在这个副本上进行修改，同时bgsave子线程可以继续把原来的数据写入RDB文件。</p>
+<p>详细：bgsave实际执⾏过程中，是⼦进程复制了主线程的页表，所以通过页表映射，能读到主线程的原始数<br>据，而当有新数据写⼊或数据修改时，主线程会把新数据或修改后的数据写到⼀个新的物理内存地址<br>上，并修改主线程自己的页表映射。所以， 子进程读到的类似于原始数据的⼀个副本，而主线程也可以<br>正常进行修改。  </p>
+<h4 id="AOF"><a href="#AOF" class="headerlink" title="AOF"></a>AOF</h4><p>AOF(append only file)是Redis的另一种持久化方式。Redis默认情况下是不开启的。</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Redis 将所有对数据库进⾏过写⼊的命令(及其参数) ( RESP)记录到 AOF ⽂件， 以此达到记录数据库状态的目的，</span><br><span class="line">这样当Redis重启后只要按顺序回放这些命令就会恢复到原始状态了。</span><br></pre></td></tr></table></figure>
+
+<p><strong>AOF会记录过程， RDB只管结果</strong>  </p>
+<p>AOF功能开启</p>
+<p>配置redis.conf</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"># 可以通过修改redis.conf配置⽂件中的appendonly参数开启</span><br><span class="line">appendonly yes</span><br><span class="line"># AOF⽂件的保存位置和RDB⽂件的位置相同，都是通过dir参数设置的。</span><br><span class="line">dir ./</span><br><span class="line"># 默认的⽂件名是appendonly.aof，可以通过appendfilename参数修改</span><br><span class="line">appendfilename appendonly.aof</span><br></pre></td></tr></table></figure>
+
  
       <!-- reward -->
       
