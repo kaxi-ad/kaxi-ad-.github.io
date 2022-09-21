@@ -1228,7 +1228,32 @@
 <p>另外，因为SAVE是由Redis主进程执行的，所以在SAVE执行期间，主进程会被阻塞，不能接受命令请求。</p>
 </li>
 </ul>
- 
+<h5 id="AOF重写"><a href="#AOF重写" class="headerlink" title="AOF重写"></a>AOF重写</h5><p>重写机制就是清理无用数据的过程</p>
+<blockquote>
+<p>重写的时候，根据键值对当前的最新状态，为他生成对应的写入命令。一个键值对在重写日志中只用一条命令即可，在日志恢复时，只用执行这条命令，就可直接完成这个键值对的写入。</p>
+</blockquote>
+<p>虽然AOF重写，日志文件会缩小，但是，要把整个数据库的最新数据的操作日志都写回磁盘，是一个非常耗时的过程。</p>
+<p><strong>重写会不会阻塞主线程？</strong></p>
+<p>和AOF日志由主线程写回不同，重写过程是由后台子进程<strong>bgrewriteaof</strong>来完成，为了避免阻塞主线程，导致数据库性能下降。</p>
+<p><strong>“一个拷贝，两处日志”</strong></p>
+<p>”一个拷贝“</p>
+<p>每次执行重写，主线程fork处后台的bgrewriteaof子进程。此时，fork会把主线程的内存拷贝一份给bgrewriteaof子进程，这里包含了数据库最新数据。</p>
+<p>“两处日志”</p>
+<p>第一处：因为主线程未阻塞，仍然可以处理新来的操作。此时，如果有写操作，第一处日志就是指正在使用的AOF日志，Redis会把这个操作写到它的缓冲区。这样，即使宕机了，这个AOF日志的操作仍然是齐全的，可用于恢复。</p>
+<p>第二处：就是指新的AOF重写日志。这个操作也会被写到重写日志的缓冲区。重写日志不会丢失最新操作。等到拷贝数据的所有操作记录重写完成后，重写日志记录的最新操作也会写入新的AOF文件。</p>
+<p><img src="/images/Redis/12.png" alt="AOF重写"></p>
+<p>触发方式：</p>
+<ul>
+<li><p>配置触发</p>
+<p>redis.conf中配置</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"># 表示当前aof⽂件⼤⼩超过上⼀次aof⽂件⼤⼩的百分之多少的时候会进⾏重写。如果之前没有</span><br><span class="line">重写过， 以启动时aof⽂件⼤⼩为准</span><br><span class="line">auto-aof-rewrite-percentage 100</span><br><span class="line"># 限制允许重写最⼩aof⽂件⼤⼩，也就是⽂件⼤⼩⼩于64mb的时候，不需要进⾏优化</span><br><span class="line">auto-aof-rewrite-min-size 64mb</span><br></pre></td></tr></table></figure>
+
+
+</li>
+<li><p>执行bgrewriteaof命令</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; bgrewriteaof</span><br><span class="line">Background append only file rewriting started</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h5 id="混合持久化"><a href="#混合持久化" class="headerlink" title="混合持久化"></a>混合持久化</h5> 
       <!-- reward -->
       
     </div>
