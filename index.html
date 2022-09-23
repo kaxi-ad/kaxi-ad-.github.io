@@ -1253,7 +1253,255 @@
 <li><p>执行bgrewriteaof命令</p>
 <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; bgrewriteaof</span><br><span class="line">Background append only file rewriting started</span><br></pre></td></tr></table></figure></li>
 </ul>
-<h5 id="混合持久化"><a href="#混合持久化" class="headerlink" title="混合持久化"></a>混合持久化</h5> 
+<h5 id="混合持久化"><a href="#混合持久化" class="headerlink" title="混合持久化"></a>混合持久化</h5><p>RDB和AOF各有缺点，Redis4.0开始支持rdb和aof的混合持久化。如果把混合持久化打开，aof rewrite的时候就直接把rdb的内容写到aof文件开头。</p>
+<h6 id="1-全量-增量的思想"><a href="#1-全量-增量的思想" class="headerlink" title="(1)全量+增量的思想"></a><strong>(1)全量+增量的思想</strong></h6><p>RDB的头+AOF的身体—&gt;appendonly.aof</p>
+<p>开启混合持久化</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">aof-use-rdb-preamble yes</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>加载时，首先会识别AOF文件是否以REDIS字符串开头，如果是就按照RDB格式加载，加载完RDB后继续按AOF加载剩余部分。</p>
+</blockquote>
+<h6 id="2-AOF文件的载入与数据还原"><a href="#2-AOF文件的载入与数据还原" class="headerlink" title="(2)AOF文件的载入与数据还原"></a><strong>(2)AOF文件的载入与数据还原</strong></h6><p>Redis读取AOF文件并还原数据库状态的详细步骤：</p>
+<ul>
+<li><p>创建一个不带网络连接的伪客户端(fake client)</p>
+<p>（因为Redis的命令只能在客户端上下文中执行，而载入AOF文件时所使用的命令直接来源于AOF文件而不是网络连接，所以服务器使用了一个没有网络连接的伪客户端来执行AOF文件保存的写命令。伪客户端执行命令的效果和带网络连接的客户端执行命令的效果完全一样。）</p>
+</li>
+<li><p>从AOF文件中分析并读取出一条写命令</p>
+</li>
+<li><p>使用伪客户端执行被读出的写命令</p>
+</li>
+<li><p>一直执行步骤2和步骤3，直到AOF文件中的所有写命令都被处理完毕为止</p>
+<p><img src="/images/Redis/13.png" alt="载入过程"></p>
+</li>
+</ul>
+<h6 id="3-RDB与AOF对比"><a href="#3-RDB与AOF对比" class="headerlink" title="(3)RDB与AOF对比"></a><strong>(3)RDB与AOF对比</strong></h6><ul>
+<li><p>RDB存某个时刻的数据快照，采用二进制压缩存储，AOF存操作命令，文本存储（混合）</p>
+</li>
+<li><p>RDB性能高、AOF性能较低</p>
+</li>
+<li><p>RDB在配置触发状态会丢失最后一次快照以后更改的所有数据，AOF设置为每秒保存一次，最多丢2秒的数据</p>
+</li>
+<li><p>Redis以主服务器模式运行，RDB不会保存过期键值对数据，Redis以从服务器模式运行，RDB会保存过期键值对，当主服务器向从服务器同步时，再清空键值对。</p>
+<p>AOF写入文件时，对过期的key会追加一条del命令，当执行AOF重写时，会忽略过期key和del命令</p>
+</li>
+</ul>
+<h6 id="4-应用场景"><a href="#4-应用场景" class="headerlink" title="(4)应用场景"></a>(4)应用场景</h6><p>内存数据库 rdb+aof 数据不容易丢</p>
+<p>有原始数据源：每次启动时都从原始数据源中初始化，则不用开启持久化(数据量较小)</p>
+<p>缓存服务器：rdb	一般	性能高</p>
+<p>在数据还原时</p>
+<p>有rdb+aof 则还原aof，因为RDB会造成文件的丢失，AOF相对数据要完整</p>
+<p>只有rdb，则还原rdb</p>
+<p>追求高性能：都不开 redis宕机从数据源恢复</p>
+<p>字典库：不驱逐，保证数据完整性 不开持久化</p>
+<p>用作DB：不能驱逐 数据量小</p>
+<p>做缓存 较高性能：开rdb</p>
+<p>Redis数据量存储过大，性能突然下降，fork时间过长阻塞主进程则只开启AOF</p>
+<h3 id="2、缓存淘汰策略"><a href="#2、缓存淘汰策略" class="headerlink" title="2、缓存淘汰策略"></a>2、缓存淘汰策略</h3><p>没有必要把所有数据都存储到内存，所有我们需要设置缓存的大小以及淘汰策略。</p>
+<h4 id="最大内存"><a href="#最大内存" class="headerlink" title="最大内存"></a>最大内存</h4><p>“八二原理”：20%的数据贡献了80%的访问。</p>
+<p>剩余80%的数据在访问量上形成长长的尾巴，”长尾效应“</p>
+<p>当80%的数据反而贡献了更多的访问量，”重尾效应“</p>
+<blockquote>
+<p>建议缓存容量设置为总数据量的15%到30%，兼顾访问性能和内存空间开销</p>
+</blockquote>
+<p>maxmemory：默认为0，不限制</p>
+<p>设置：</p>
+<p>在redis.conf中</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">maxmemory 1024mb</span><br></pre></td></tr></table></figure>
+
+<p>命令行设置</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CONFIG GET maxmemory 4gb</span><br></pre></td></tr></table></figure>
+
+<p>获得maxmemory数</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CONFIG GET maxmemory</span><br></pre></td></tr></table></figure>
+
+<h4 id="expire数据结构"><a href="#expire数据结构" class="headerlink" title="expire数据结构"></a>expire数据结构</h4><p>设置一个键的存活时间(ttl:time to live)，过了这段时间，该键就会自动被删除</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">192.168.200.132:0&gt;expire name 2 #2秒失效</span><br><span class="line">&quot;0&quot;</span><br><span class="line">192.168.200.132:0&gt;get name</span><br><span class="line">null</span><br><span class="line">192.168.200.132:0&gt;set name zhangfei</span><br><span class="line">&quot;OK&quot;</span><br><span class="line">192.168.200.132:0&gt;ttl name #永久</span><br><span class="line">&quot;-1&quot;</span><br><span class="line">192.168.200.132:0&gt;expire name 30 #30秒失效</span><br><span class="line">&quot;1&quot;</span><br><span class="line">192.168.200.132:0&gt;ttl name #还有19秒失效</span><br><span class="line">&quot;19&quot;</span><br><span class="line">192.168.200.132:0&gt;ttl name #失效</span><br><span class="line">&quot;-2&quot;</span><br></pre></td></tr></table></figure>
+
+<p><strong>expire原理</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">redisDb</span>&#123;</span></span><br><span class="line">	dict *dict;	-- key-&gt;Value</span><br><span class="line">    dict *expires;	--key-&gt;ttl 维护所有有ttl的key</span><br><span class="line">    dict *blocking_keys;</span><br><span class="line">    dict *ready_keys;</span><br><span class="line">    dict *watched_keys;</span><br><span class="line">    <span class="type">int</span> id;</span><br><span class="line">&#125;redisDb;</span><br></pre></td></tr></table></figure>
+
+<p>dict用于维护一个Redis数据库中包含的所有Key-Value键值对，expires则用于维护一个Redis数据库中设置失效时间的键(即key与失效时间的映射)。</p>
+<blockquote>
+<p>设置了失效时间的key和具体的失效时间全部都维护在expires这个字典表中。</p>
+</blockquote>
+<h4 id="删除策略"><a href="#删除策略" class="headerlink" title="删除策略"></a>删除策略</h4><p>Redis的数据删除有定时删除、惰性删除和主动删除三种方式</p>
+<p>Redis目前采用惰性删除+主动删除方式</p>
+<h5 id="定时删除"><a href="#定时删除" class="headerlink" title="定时删除"></a>定时删除</h5><p>在设置键的过期时间的同时，创建一个定时器，让定时器在键的过期时间来临时，立即执行对键的删除操作。</p>
+<p>需要创建定时器，而且消耗cpu，一般不推荐使用。</p>
+<h5 id="惰性删除"><a href="#惰性删除" class="headerlink" title="惰性删除"></a>惰性删除</h5><p>在key被访问时如果发现它已经失效，那么就删除它。</p>
+<p>expireIfNeeded函数：读取数据之前西安检查一下它有没有失效，如果失效了就删除它。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">expireIfNeeded</span><span class="params">(redisDb *db,robj *key)</span>&#123;</span><br><span class="line">	<span class="comment">//获取主键的失效时间 get当前时间-创建时间&gt;ttl</span></span><br><span class="line">    <span class="type">long</span> <span class="type">long</span> when = getExpire(db,key);</span><br><span class="line">	<span class="comment">//假如失效时间为负数，说明该主键未设置失效时间（失效时间默认为-1），直接返回0</span></span><br><span class="line">    <span class="keyword">if</span> (when &lt; <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="comment">//假如Redis服务器正在从RDB⽂件中加载数据，暂时不进⾏失效主键的删除，直接返回0</span></span><br><span class="line">    <span class="keyword">if</span> (server.loading) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">//如果以上条件都不满⾜，就将主键的失效时间与当前时间进⾏对⽐，如果发现指定的主键</span></span><br><span class="line">    <span class="comment">//还未失效就直接返回0</span></span><br><span class="line">    <span class="keyword">if</span> (mstime() &lt;= when) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="comment">//如果发现主键确实已经失效了，那么⾸先更新关于失效主键的统计个数，然后将该主键失</span></span><br><span class="line">    <span class="comment">//效的信息进⾏⼴播，最后将该主键从数据库中删除</span></span><br><span class="line">    server.stat_expiredkeys++;</span><br><span class="line">    propagateExpire(db,key);</span><br><span class="line">    <span class="keyword">return</span> dbDelete(db,key);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h5 id="主动删除"><a href="#主动删除" class="headerlink" title="主动删除"></a>主动删除</h5><p><img src="/images/Redis/14.png" alt="内存淘汰策略"></p>
+<p>在redis.conf文件中可以配置主动删除策略，默认no-enviction(不删除)</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">maxmemory-policy allkeys-lru</span><br></pre></td></tr></table></figure>
+
+<h6 id="LRU"><a href="#LRU" class="headerlink" title="LRU"></a>LRU</h6><p>Least Recently Used:最近最少使用原则筛选</p>
+<p>Redis 默认会记录每个数据的最近⼀次访问的时间戳（由键值对数据结构 RedisObject 中的 lru 字段记录）。  </p>
+<blockquote>
+<p>第⼀次会随机选出 N 个数据，把它们作为⼀个候选集合。接下来，Redis 会⽐较这 N 个数据的 lru 字段，把 lru 字段值最⼩的数据从缓存中淘汰出去。  </p>
+</blockquote>
+<p>配置数据格式N</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CONFIG SET maxmemory-samples 100</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>当再次淘汰数据时，选取标准：能进⼊候选集合的数据的 lru 字段值必须小于候选集合中最小的 lru 值   </p>
+</blockquote>
+<p><strong>长度可控的链表</strong></p>
+<h6 id="LFU"><a href="#LFU" class="headerlink" title="LFU"></a>LFU</h6><p>LFU(Least frequently used)最不经常使用，如果一个数据在最近一段时间内使用次数很少，那么在将来一段时间被使用的可能性也很小。</p>
+<p>volatile-flu</p>
+<p>allkeys-flu</p>
+<h6 id="random"><a href="#random" class="headerlink" title="random"></a>random</h6><p>随机</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">volatile-random</span><br><span class="line">从已设置过期时间的数据集(server.db[i].expires)中任意选择数据淘汰</span><br><span class="line">allkeys-random</span><br><span class="line">从数据集(server.db[i].dict)中任意选择数据淘汰  </span><br></pre></td></tr></table></figure>
+
+<h6 id="ttl"><a href="#ttl" class="headerlink" title="ttl"></a>ttl</h6><p>volatile-ttl</p>
+<p>从已设置过期时间的数据集(server.db[i].expires)中挑选将要过期的数据淘汰redis数据集数据结构中保存了键值对过期时间的表，即redisDb.expires。</p>
+<p>TTL数据淘汰机制：从过期时间的表中随机挑选几个键值对，取出其中ttl最小的键值对淘汰。</p>
+<h6 id="noenviction"><a href="#noenviction" class="headerlink" title="noenviction"></a>noenviction</h6><p>禁止驱逐数据，不删除 默认</p>
+<h4 id="选取策略"><a href="#选取策略" class="headerlink" title="选取策略"></a>选取策略</h4><p>缓存场景：</p>
+<ul>
+<li>优先使用allkeys-lru可以充分利用LRU的优势，如果数据冷热分离明显，可以尽量把热数据留在内存，提高系统性能</li>
+<li>如果访问频率相差不大可以使用allkeys-random</li>
+</ul>
+<p>内存数据库：</p>
+<ul>
+<li>不能淘汰，保证数据完整，使⽤noenviction，并且maxmemory 设置到最⼤(物理内存-1G)</li>
+</ul>
+<h3 id="3、通讯机制"><a href="#3、通讯机制" class="headerlink" title="3、通讯机制"></a>3、通讯机制</h3><h4 id="通讯协议"><a href="#通讯协议" class="headerlink" title="通讯协议"></a>通讯协议</h4><p>Redis是单进程单线程的。</p>
+<p>应用系统和Redis通过Redis协议(RESP进行交互)</p>
+<p>请求响应模式</p>
+<p>Redis协议位于TCP层之上，即客户端和Redis示例保持双工的连接。</p>
+<ul>
+<li><p><strong>串行的请求响应模式(ping-pong)</strong></p>
+<p>客户端与服务端建立长连接</p>
+<p>连接通过心跳机制检测(ping-pong)ack应答</p>
+<p>telnet和redis-cli发出的命令都属于该种模式</p>
+<p>特点：</p>
+<ul>
+<li>有问有答</li>
+<li>耗时在网络传输命令</li>
+<li>性能较低</li>
+</ul>
+</li>
+<li><p><strong>双工的请求响应模式(pipeline)</strong></p>
+<p>批量请求，批量响应</p>
+<p>请求响应交叉进行，不会混淆(TCP双工)</p>
+<ul>
+<li>pipeline的作用是将一批命令进行打包，然后发送给服务器，服务器执行完按顺序打包返回。</li>
+<li>通过pipeline，一次pipeline(n条命令)&#x3D;一次网络时间+n次命令时间</li>
+</ul>
+<p>通过Jedis可以很方便的使用pipeline</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Jedis</span> <span class="variable">redis</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Jedis</span>(<span class="string">&quot;192.168.1.111&quot;</span>, <span class="number">6379</span>);</span><br><span class="line">redis.auth(<span class="string">&quot;12345678&quot;</span>);<span class="comment">//授权密码 对应redis.conf的requirepass密码</span></span><br><span class="line"><span class="type">Pipeline</span> <span class="variable">pipe</span> <span class="operator">=</span> jedis.pipelined();</span><br><span class="line"><span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">0</span>; i &lt;<span class="number">50000</span>; i++) &#123;</span><br><span class="line">	pipe.set(<span class="string">&quot;key_&quot;</span>+String.valueOf(i),String.valueOf(i));</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//将封装后的PIPE⼀次性发给redis</span></span><br><span class="line">pipe.sync();</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>原子化的批量请求相应模式(事务)</strong></p>
+<p>Redis可以利用事务机制批量执行命令</p>
+</li>
+<li><p><strong>发布订阅模式(pub&#x2F;sub)</strong></p>
+<p>一个客户端触发，多个客户端被动接收，通过服务器中转。</p>
+</li>
+<li><p><strong>脚本化的批量执行(lua)</strong></p>
+<p>客户端向服务器端提交⼀个lua脚本，服务器端执行该脚本。</p>
+</li>
+</ul>
+<h4 id="poll-epoll-select区别-重要"><a href="#poll-epoll-select区别-重要" class="headerlink" title="poll epoll select区别(重要)"></a>poll epoll select区别(重要)</h4><h5 id="socket编程"><a href="#socket编程" class="headerlink" title="socket编程"></a>socket编程</h5><p>使用Socket模型实现网络通信时，需要经过创建Socket、监听端口、处理连接和读写请求等多个步骤</p>
+<ul>
+<li>创建监听客户端连接的监听套接字(Listening socket)<ul>
+<li>调用socket函数，创建一个套接字。主动套接字(Active Socket)</li>
+<li>调用bind函数，将主动套接字和当前服务器的ip和监听端口进行绑定</li>
+<li>调用listen函数，将主动套接字转换为监听套接字，开始监听客户端连接</li>
+</ul>
+</li>
+<li>运行一个循环流程，在流程中调用accept函数(阻塞函数)，用于接收客户端连接请求。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">listenSocket = socket(); <span class="comment">//调⽤socket系统调⽤创建⼀个主动套接字</span></span><br><span class="line">bind(listenSocket); <span class="comment">//绑定地址和端⼝</span></span><br><span class="line">listen(listenSocket); <span class="comment">//将默认的主动套接字转换为服务器使⽤的被动套接字，也就是监听</span></span><br><span class="line">套接字</span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123; <span class="comment">//循环监听是否有客户端连接请求到来</span></span><br><span class="line">	connSocket = accept(listenSocket); <span class="comment">//接受客户端连接</span></span><br><span class="line">	recv(connsocket); <span class="comment">//从客户端读取数据，只能同时处理⼀个客户端</span></span><br><span class="line">	<span class="comment">//....业务操作</span></span><br><span class="line">	send(connsocket); <span class="comment">//给客户端返回数据，只能同时处理⼀个客户端</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>Redis执行流程是由一个线程执行</strong></p>
+<p><strong>IO多路复用机制</strong>，让程序通过调用多路复用函数，同时监听多个套接字上的请求。这里即可以包括监听套接字上的连接请求，也可以包括已连接套接字上的读写请求。这样当有一个或多个套接字上有请求时，多路复用函数就会返回。</p>
+<blockquote>
+<p>一个线程可以同时处理多个socket避免io未就绪造成线程的阻塞</p>
+</blockquote>
+<h5 id="select"><a href="#select" class="headerlink" title="select"></a>select</h5><p>select机制中一个重要函数就是<strong>select函数</strong>。</p>
+<p>它的参数包括监听的文件描述符数量_nfds、被监听描述符的三个集合*_writefds、*_writefds和*_exceptfds，以及监听时阻塞等待的超时时长*_timeout。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">select</span> <span class="params">(<span class="type">int</span> __nfds, fd_set *__readfds, fd_set *__writefds, fd_set *__exceptfds, <span class="keyword">struct</span> timeval *__timeout)</span></span><br></pre></td></tr></table></figure>
+
+<p>select函数的三个集合，表示监听的三类事件，读数据事件(_readfds集合)、写数据事件(_writefds集合)、异常事件(_exceptfds集合)</p>
+<p>fd_set结构体主要定义部分。_fd_mask类型是long int类型的别名，FD_SETSIZE和_NFDBITS这两个宏定义的大小默认为1024和32。</p>
+<p>fd_set主要定义部分如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    …</span><br><span class="line">    __fd_mask __fds_bits[__FD_SETSIZE / __NFDBITS];</span><br><span class="line">    …</span><br><span class="line">&#125; fd_set</span><br></pre></td></tr></table></figure>
+
+<p>fd_set结构体的定义，其实就是⼀个long int类型的数组，该数组中⼀共有32个元素（1024&#x2F;32&#x3D;32），每个元素是32位（long int类型的大小），而每⼀位可以用来表示⼀个文件描述符的状态。 select函数对每⼀个描述符集合，都可以监听1024个描述符。（使用位运算）  </p>
+<p>代码调用流程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> sock_fd,conn_fd; <span class="comment">//监听套接字和已连接套接字的变量</span></span><br><span class="line">sock_fd = socket() <span class="comment">//创建套接字</span></span><br><span class="line">bind(sock_fd) <span class="comment">//绑定套接字</span></span><br><span class="line">listen(sock_fd) <span class="comment">//在套接字上进⾏监听，将套接字转为监听套接字</span></span><br><span class="line">    </span><br><span class="line">fd_set rset; <span class="comment">//被监听的描述符集合，关注描述符上的读事件</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> max_fd = sock_fd</span><br><span class="line">    </span><br><span class="line"><span class="comment">//初始化rset数组，使⽤FD_ZERO宏设置每个元素为0</span></span><br><span class="line">FD_ZERO(&amp;rset);</span><br><span class="line"><span class="comment">//使⽤FD_SET宏设置rset数组中位置为sock_fd的⽂件描述符为1，表示需要监听该⽂件描述符</span></span><br><span class="line">FD_SET(sock_fd,&amp;rset);</span><br><span class="line"></span><br><span class="line"><span class="comment">//设置超时时间</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">timeval</span> <span class="title">timeout</span>;</span></span><br><span class="line">timeout.tv_sec = <span class="number">3</span>;</span><br><span class="line">timeout.tv_usec = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span>(<span class="number">1</span>) &#123;</span><br><span class="line">	<span class="comment">//调⽤select函数，检测rset数组保存的⽂件描述符是否已有读事件就绪，返回就绪的⽂件描述符个数</span></span><br><span class="line">    n = select(max_fd+<span class="number">1</span>, &amp;rset, <span class="literal">NULL</span>, <span class="literal">NULL</span>, &amp;timeout);</span><br><span class="line">    <span class="comment">//调⽤FD_ISSET宏，在rset数组中检测sock_fd对应的⽂件描述符是否就绪</span></span><br><span class="line">    <span class="keyword">if</span> (FD_ISSET(sock_fd, &amp;rset)) &#123;</span><br><span class="line">        <span class="comment">//如果sock_fd已经就绪，表明已有客户端连接；调⽤accept函数建⽴连接</span></span><br><span class="line">        conn_fd = accept();</span><br><span class="line">        <span class="comment">//设置rset数组中位置为conn_fd的⽂件描述符为1，表示需要监听该⽂件描述符</span></span><br><span class="line">        FD_SET(conn_fd, &amp;rset);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">//依次检查已连接套接字的⽂件描述符</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; maxfd; i++) &#123;</span><br><span class="line">        <span class="comment">//调⽤FD_ISSET宏，在rset数组中检测⽂件描述符是否就绪</span></span><br><span class="line">        <span class="keyword">if</span> (FD_ISSET(i, &amp;rset)) &#123;</span><br><span class="line">        <span class="comment">//有数据可读，进⾏读数据处理</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>select函数存在两个设计上的不足：</p>
+<ul>
+<li>select函数对单个进程能监听的文件描述符数量是有限制的，它能监听的文件描述符个数由_FD_SETSIZE决定，默认值1024</li>
+<li>当select函数返回后，我们需要遍历描述符集合，才能找到具体是哪些描述符就绪了。这个遍历过程会产生一定开销，降低程序性能。</li>
+</ul>
+<p>为了解决select函数受限于1024个文件描述符的不足， poll函数对此做了改进。  </p>
+<h5 id="poll"><a href="#poll" class="headerlink" title="poll"></a>poll</h5><p>poll机制主要函数是poll函数，原型定义：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">poll</span> <span class="params">(<span class="keyword">struct</span> pollfd *__fds, <span class="type">nfds_t</span> __nfds, <span class="type">int</span> __timeout)</span>;</span><br></pre></td></tr></table></figure>
+
+<p>*_fds是pollfd结构体数组,_nfds是fds数组的元素个数，而_timeout表示poll函数阻塞的超时时间</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">pollfd</span>&#123;</span></span><br><span class="line">	<span class="type">int</span> fd;		<span class="comment">//进行监听的文件描述符</span></span><br><span class="line">    <span class="type">short</span> <span class="type">int</span> events;	<span class="comment">//要监听的事件类型</span></span><br><span class="line">    <span class="type">short</span> <span class="type">int</span> revents;	<span class="comment">//实际发生的事件类型</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>pollfd结构体中要监听和实际发生的事件类型</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> POLLRDNORM 0x040	<span class="comment">//可读时间</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> POLLWRNORM 0x100	<span class="comment">//可写事件</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> POLLERR		0x008	<span class="comment">//错误事件</span></span></span><br></pre></td></tr></table></figure>
+
+<p>poll函数完成网络通信三步：</p>
+<ul>
+<li>第一步，创建pollfd数组和监听套接字，并进行绑定;</li>
+<li>第二步，将监听套接字加入pollfd数组，并设置其监听读事件，也就是客户端的连接请求；</li>
+<li>第三步，循环调用poll函数，检测pollfd数组中是否有就绪的文件描述符<ul>
+<li>如果是连接套接字就绪，这表明有客户端连接，可以调用accept接收连接，并创建已连接套接字，并将其加入pollfd数组，并监听读事件。</li>
+<li>如果是已连接套接字就绪，表明客户端有读写请求，我们可以调用recv&#x2F;send函数处理读写请求</li>
+</ul>
+</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> sock_fd,conn_fd; <span class="comment">//监听套接字和已连接套接字的变量</span></span><br><span class="line">sock_fd = socket() <span class="comment">//创建套接字</span></span><br><span class="line">bind(sock_fd) <span class="comment">//绑定套接字</span></span><br><span class="line">listen(sock_fd) <span class="comment">//在套接字上进⾏监听，将套接字转为监听套接字</span></span><br><span class="line">    </span><br><span class="line"><span class="comment">//poll函数可以监听的⽂件描述符数量，可以⼤于1024</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> MAX_OPEN = 2048</span></span><br><span class="line">    </span><br><span class="line"><span class="comment">//pollfd结构体数组，对应⽂件描述符</span></span><br><span class="line"><span class="keyword">struct</span> pollfd client[MAX_OPEN];</span><br><span class="line"></span><br><span class="line"><span class="comment">//将创建的监听套接字加⼊pollfd数组，并监听其可读事件</span></span><br><span class="line">client[<span class="number">0</span>].fd = sock_fd;</span><br><span class="line">client[<span class="number">0</span>].events = POLLRDNORM;</span><br><span class="line">maxfd = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">//初始化client数组其他元素为-1</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">1</span>; i &lt; MAX_OPEN; i++)</span><br><span class="line">	client[i].fd = <span class="number">-1</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span>(<span class="number">1</span>) &#123;</span><br><span class="line">	<span class="comment">//调⽤poll函数，检测client数组⾥的⽂件描述符是否有就绪的，返回就绪的⽂件描述符个数</span></span><br><span class="line">	n = poll(client, maxfd+<span class="number">1</span>, &amp;timeout);</span><br><span class="line">	<span class="comment">//如果监听套件字的⽂件描述符有可读事件，则进⾏处理</span></span><br><span class="line">	<span class="keyword">if</span> (client[<span class="number">0</span>].revents &amp; POLLRDNORM) &#123;</span><br><span class="line">		<span class="comment">//有客户端连接；调⽤accept函数建⽴连接</span></span><br><span class="line">		conn_fd = accept();</span><br><span class="line">        </span><br><span class="line">		<span class="comment">//保存已建⽴连接套接字</span></span><br><span class="line">		<span class="keyword">for</span> (i = <span class="number">1</span>; i &lt; MAX_OPEN; i++)&#123;</span><br><span class="line">			<span class="keyword">if</span> (client[i].fd &lt; <span class="number">0</span>) &#123;</span><br><span class="line">				client[i].fd = conn_fd; <span class="comment">//将已建⽴连接的⽂件描述符保存到client数组</span></span><br><span class="line">				client[i].events = POLLRDNORM; <span class="comment">//设置该⽂件描述符监听可读事件</span></span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		maxfd = i;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//依次检查已连接套接字的⽂件描述符</span></span><br><span class="line">	<span class="keyword">for</span> (i = <span class="number">1</span>; i &lt; MAX_OPEN; i++) &#123;</span><br><span class="line">		<span class="keyword">if</span> (client[i].revents &amp; (POLLRDNORM | POLLERR)) &#123;</span><br><span class="line">		<span class="comment">//有数据可读或发⽣错误，进⾏读数据处理或错误处理</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>与select相比，它允许一次监听超过1024个文件描述符，调用了poll函数后，仍需要遍历每个文件描述符，检测描述符是否就绪，再进行处理。</p>
+<p>有没有方法避免遍历每个描述符？epoll机制</p>
+<h5 id="epoll-重点"><a href="#epoll-重点" class="headerlink" title="epoll(重点)"></a>epoll(重点)</h5><p>epoll机制使用epoll_event结构体，来记录待监听的文件描述符及其监听的事件类型的。</p>
+<p>epoll_event结构体，其中包含了epoll_data_t联合体变量，以及整数类型的events变量。而events变量会取值使用不同的宏定义值，来表示epoll_data_t变量中的文件描述符所关注的事件类型。</p>
+<ul>
+<li>EPOLLIN：读事件，表示⽂件描述符对应套接字有数据可读。</li>
+<li>EPOLLOUT：写事件，表示⽂件描述符对应套接字有数据要写。</li>
+<li>EPOLLERR：错误事件，表示⽂件描述符对于套接字出错。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">union</span> <span class="title">epoll_data</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	...</span><br><span class="line">	<span class="type">int</span> fd; <span class="comment">//记录⽂件描述符</span></span><br><span class="line">	...</span><br><span class="line">&#125; <span class="type">epoll_data_t</span>;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span></span></span><br><span class="line"><span class="class">&#123;</span></span><br><span class="line">	<span class="type">uint32_t</span> events; <span class="comment">//epoll监听的事件类型</span></span><br><span class="line">	<span class="type">epoll_data_t</span> data; <span class="comment">//应⽤程序数据</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>在select或者poll函数时，创建好文件描述符集合或pollfd数组后，就可以往数组中添加我们需要监听的文件描述符。</p>
+<p>对于epoll机制来说，我们需要先调用epoll_create函数，创建一个epoll实例。这个epoll实例内部维护了两个结构，分别是记录要监听的<strong>文件描述符和已经就绪的文件描述符</strong>，对于已经就绪的文件描述符，会被返回给用户程序进行处理。</p>
+<p>所以在使用epoll机制时，不需要遍历查询哪些文件描述符已就绪。</p>
+<blockquote>
+<p>创建epoll实例后，需要再使用epoll_ctl函数，给被监听的文件描述符添加监听事件类型，以及使用epoll_wait函数获取就绪的文件描述符。</p>
+</blockquote>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">epoll_create</span><span class="params">(<span class="type">int</span> size)</span></span><br></pre></td></tr></table></figure>
+
+
+
+<blockquote>
+<p>创建⼀个epoll的句柄。⾃从linux2.6.8之后， size参数是被忽略的。需要注意的是，当创建好epoll句柄后，它就是会占⽤⼀个fd值，在linux下如果查看&#x2F;proc&#x2F;进程id&#x2F;fd&#x2F;，是能够看到这个fd的，所以在使⽤完epoll后，必须调⽤close()关闭，否则可能导致fd被耗尽。  </p>
+</blockquote>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">epoll_ctl</span><span class="params">(<span class="type">int</span> epfd, <span class="type">int</span> op, <span class="type">int</span> fd, <span class="keyword">struct</span> epoll_event *event)</span></span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>poll的事件注册函数，它不同于select()是在监听事件时告诉内核要监听什么类型的事件，⽽是在这⾥先注册要监听的事件类型。<br>第⼀个参数是epoll_create()的返回值。<br>第⼆个参数表示动作，⽤三个宏来表示：<br>EPOLL_CTL_ADD：注册新的fd到epfd中；<br>EPOLL_CTL_MOD：修改已经注册的fd的监听事件；<br>EPOLL_CTL_DEL：从epfd中删除⼀个fd；<br>第三个参数是需要监听的fd。<br>第四个参数是告诉内核需要监听什么事  </p>
+</blockquote>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">epoll_wait</span><span class="params">(<span class="type">int</span> epfd, <span class="keyword">struct</span> epoll_event * events, <span class="type">int</span> maxevents, <span class="type">int</span> timeout)</span>;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>等待内核返回的可读写事件，最多返回maxevents个事件。</p>
+</blockquote>
+<p>epoll网络通信流程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> sock_fd,conn_fd; <span class="comment">//监听套接字和已连接套接字的变量</span></span><br><span class="line">sock_fd = socket() <span class="comment">//创建套接字</span></span><br><span class="line">bind(sock_fd) <span class="comment">//绑定套接字</span></span><br><span class="line">listen(sock_fd) <span class="comment">//在套接字上进⾏监听，将套接字转为监听套接字</span></span><br><span class="line"></span><br><span class="line">epfd = epoll_create(EPOLL_SIZE); <span class="comment">//创建epoll实例，</span></span><br><span class="line"><span class="comment">//创建epoll_event结构体数组，保存套接字对应⽂件描述符和监听事件类型</span></span><br><span class="line">ep_events = (epoll_event*)<span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(epoll_event) * EPOLL_SIZE);</span><br><span class="line"></span><br><span class="line"><span class="comment">//创建epoll_event变量</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">ee</span></span></span><br><span class="line"><span class="class">//监听读事件</span></span><br><span class="line"><span class="class"><span class="title">ee</span>.<span class="title">events</span> =</span> EPOLLIN;</span><br><span class="line"><span class="comment">//监听的⽂件描述符是刚创建的监听套接字</span></span><br><span class="line">ee.data.fd = sock_fd;</span><br><span class="line"></span><br><span class="line"><span class="comment">//将监听套接字加⼊到监听列表中</span></span><br><span class="line">epoll_ctl(epfd, EPOLL_CTL_ADD, sock_fd, &amp;ee);</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">	<span class="comment">//等待返回已经就绪的描述符</span></span><br><span class="line">	n = epoll_wait(epfd, ep_events, EPOLL_SIZE, <span class="number">-1</span>);</span><br><span class="line">	<span class="comment">//遍历所有就绪的描述符</span></span><br><span class="line">	<span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">		<span class="comment">//如果是监听套接字描述符就绪，表明有⼀个新客户端连接到来</span></span><br><span class="line">		<span class="keyword">if</span> (ep_events[i].data.fd == sock_fd) &#123;</span><br><span class="line">			conn_fd = accept(sock_fd); <span class="comment">//调⽤accept()建⽴连接</span></span><br><span class="line">			ee.events = EPOLLIN;</span><br><span class="line">			ee.data.fd = conn_fd;</span><br><span class="line">			<span class="comment">//添加对新创建的已连接套接字描述符的监听，监听后续在已连接套接字上的读事件</span></span><br><span class="line">			epoll_ctl(epfd, EPOLL_CTL_ADD, conn_fd, &amp;ee);</span><br><span class="line">		&#125; <span class="keyword">else</span> &#123; <span class="comment">//如果是已连接套接字描述符就绪，则可以读数据</span></span><br><span class="line">		...<span class="comment">//读取数据并处理</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>总结：</p>
+<p><img src="/images/Redis/15.png" alt="总结"></p>
+<h4 id="Reactor模型"><a href="#Reactor模型" class="headerlink" title="Reactor模型"></a>Reactor模型</h4> 
       <!-- reward -->
       
     </div>
